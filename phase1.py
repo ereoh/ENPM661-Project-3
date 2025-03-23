@@ -1,8 +1,13 @@
 import numpy as np
-import cv2
 from collections import deque
 import sys
 import heapq
+
+import matplotlib.pyplot as plt
+import matplotlib.image
+import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
+from tqdm import tqdm
 
 # Define colors
 red = (0, 0, 255)
@@ -257,20 +262,7 @@ class OneObstacle(Obstacle):
         # Check if point is inside bar of 1 shape
         return self.bar.is_inside_obstacle(x, y)
 
-# Function to draw the canvas with obstacles
-def draw_canvas(obstacles, canvas):
-    # Iterate over canvas pixels
-    for i in range(canvas.shape[0]):
-        for j in range(canvas.shape[1]):
-            for obstacle in obstacles:
-                # Convert canvas coordinates to obstacle coordinates
-                y = 49 - i
-                x = j
-                # Color pixel if inside obstacle
-                if obstacle.is_inside_obstacle(x, y):
-                    canvas[i, j] = red
-
-def astar_search(start, goal, obstacles, canvas):
+def astar_search(start, goal, obstacles):
     # Define possible moves and their costs
     moves = [(-1, 0, 1.0), (-1, 1, 1.4), (0, 1, 1.0), (1, 1, 1.4),
              (1, 0, 1.0), (1, -1, 1.4), (0, -1, 1.0), (-1, -1, 1.4)]
@@ -287,19 +279,15 @@ def astar_search(start, goal, obstacles, canvas):
     C2C = {start: 0}  # Cost from start to current node
     total_cost = {start: heuristic(start, goal)}  # Estimated cost from start to goal
     parent = {}  # To reconstruct the path
-    
-    frame_buffer = []  # Store frames for smooth playback
+    closed_set = [] # track visited nodes
     
     while open_set:
         # Get the node with the lowest f_score
         _, current = heapq.heappop(open_set)
         x, y = current
         
-        # Mark the current node as visited on the canvas
-        if (x, y) != start and (x, y) != goal:
-            canvas[50 - y, x - 1] = blue
-        
-        frame_buffer.append(canvas.copy())
+        # Mark the current node as visited in closed set
+        closed_set.append(current)
         
         # If the goal is reached, exit the loop
         if current == goal:
@@ -316,6 +304,7 @@ def astar_search(start, goal, obstacles, canvas):
             
             # Calculate the tentative C2C for the new position
             tentative_C2C = C2C[current] + cost
+            
             if new_pos not in C2C or tentative_C2C < C2C[new_pos]:
                 # Update the parent, C2C, and total_cost for the new position
                 parent[new_pos] = current
@@ -333,33 +322,7 @@ def astar_search(start, goal, obstacles, canvas):
 
     print("Path found!")
 
-    # Smoothly draw the path
-    for i in range(len(path) - 1):
-        x1, y1 = path[i]
-        x2, y2 = path[i + 1]
-        cv2.line(canvas, (x1, 49 - y1), (x2, 49 - y2), green, 1)
-        frame_buffer.append(canvas.copy())
-
-    # add 2 seconds of end frames
-    for i in range(120):
-        frame_buffer.append(canvas.copy())
-    
-    # Save the frames as an MP4 file
-    height, width, layers = canvas.shape
-    video = cv2.VideoWriter('AStar_animation.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 60, (width, height))
-
-    for frame in frame_buffer:
-        video.write(frame)
-
-    video.release()
-    print("Animation saved as AStar_animation.mp4")
-
-    # Play back the frames animation
-    for frame in frame_buffer:
-        cv2.imshow("Canvas", frame)
-        cv2.waitKey(1)
-
-    return path
+    return path, closed_set
 
 def is_valid_point(x, y, obstacles):
     # Check if point is within canvas bounds and not inside any obstacle
@@ -370,9 +333,114 @@ def is_valid_point(x, y, obstacles):
             return False
     return True
 
-# Initialize canvas and obstacles
-canvas = np.zeros((50, 180, 3), np.uint8)
-canvas[:] = grey
+## Animation Functions
+
+def init_animation(start, goal, path, obstacles, num_visited):
+    print("Initializing animation")
+
+    # draw background
+    fig, ax = plt.subplots(figsize=(15, 6))
+    fig.suptitle(f'A-Star Search from {start} to {goal}')
+    ax.set_xlim(-10, 190)
+    ax.set_ylim(-10, 60)
+    # Draw borders (Blue)
+    border_x = [0-1, 0-1, 180, 180, 0-1]
+    border_y = [0-1, 50, 50, 0-1, 0-1]
+    ax.plot(border_x, border_y, linewidth=2, c='b')
+
+    # draw obstacles (Blue)
+    for i in range(WIDTH):
+        for j in range(HEIGHT):
+            for obstacle in obstacles:
+                # Color pixel if inside obstacle
+                if obstacle.is_inside_obstacle(i, j):
+                    ax.plot(i, j, marker='s', color='blue')
+
+    # draw start (Green)
+    ax.scatter(start[0], start[1], marker='s', c='#7dffa0')
+
+    # draw goal (Red)
+    ax.scatter(goal[0], goal[1], marker='s', c='red')
+
+    # Init exploration and path artists
+    exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
+    exploration_draw.set_clim(0, num_visited) # colorbar init
+    path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
+
+    # Init Colorbar
+    cstep = max(1, int(num_visited / 10)) # want 10 ticks along colorbar
+    cbar = fig.colorbar(exploration_draw, ax=ax)
+    cbar.set_label('Explored Order')
+
+    filename = f"AStar_animation_{start[0]}-{start[1]}_to_{goal[0]}-{goal[1]}"
+
+    return fig, exploration_draw, path_line, cbar, cstep, filename
+
+def update_animation(i):
+    # first draw exploration
+    if i < num_visited:
+        exploration_draw.set_offsets(np_closed_set[:i])
+        exploration_draw.set_array(np.arange(i))
+        cbar.set_ticks(np.arange(0, np_closed_set.shape[0], cstep))
+
+        path_line.set_data([],[])
+    # then path
+    else:
+        idx = i - np_closed_set.shape[0]
+        path_line.set_data(np_path[:idx].T)
+
+    return exploration_draw, path_line,
+
+def save_update(i, total):
+    save_progress.update(1)
+
+def create_animation(fig, num_frames, filename, show=True, write=True):
+    global save_progress
+    # generate animation
+    ani = FuncAnimation(
+        fig, 
+        update_animation, 
+        frames=num_frames, 
+        interval=30, 
+        blit=True, 
+    )
+
+    if show:
+        plt.show()
+
+    if write:
+
+        save_progress = tqdm(total = num_frames, desc = "Saving Animation", unit='frames')
+        # save as MP4 or GIF
+        available_writers = animation.writers.list()
+        available_writers = animation.writers.list()
+
+        writer = 'ffmpeg'
+
+        if 'ffmpeg' in available_writers:
+            filename += ".mp4"
+        else:
+            filename += ".gif"
+            writer = "pillow"
+
+        # write animation as gif to disk
+        if writer == 'pillow':
+            print("Warning: ffmpeg not found! Using pillow and saving as GIF. This is significantly slower.")
+        
+        ani.save(
+            filename, 
+            writer=writer, 
+            fps=60, 
+            progress_callback=save_update
+        )
+        print(f"Saved animation to {filename}")
+
+
+# Code starts here
+
+# Initialize Variables
+WIDTH = 180
+HEIGHT = 50
 E_obstacle = EObstacle((10, 10), 20, 30)
 N_obstacle = NObstacle((35, 10), 20, 30)
 P_Obstacle = PObstacle((60, 10), 20, 30)
@@ -383,8 +451,6 @@ One_Obstacle = OneObstacle((150, 10), 10, 30)
 
 Obstacles = [E_obstacle, N_obstacle, P_Obstacle, M_Obstacle, Six_Obstacle_1, Six_Obstacle_2, One_Obstacle]
 
-# Draw obstacles on the canvas
-draw_canvas(Obstacles, canvas)
 
 # Request start and goal points from the command line
 try:
@@ -406,14 +472,22 @@ if not is_valid_point(goal_x, goal_y, Obstacles):
 start = (start_x, start_y)
 goal = (goal_x, goal_y)
 
-# Color the start and goal points green on the canvas
-canvas[49 - start_y, start_x] = green
-canvas[49 - goal_y, goal_x] = green
 
-# Perform BFS search and get the path
-path = astar_search(start, goal, Obstacles, canvas)
+# Perform A Star search and get the path
+path, closed_set = astar_search(start, goal, Obstacles)
 
-# Display the final canvas
-cv2.imshow("Canvas", canvas)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# convert to numpy arrays for animation
+np_path = np.array(path)
+np_closed_set = np.array(closed_set)
+
+num_visited = np_closed_set.shape[0]
+path_length = len(path)
+num_frames = num_visited + path_length
+
+# Animate exploration and path
+fig, exploration_draw, path_line, cbar, cstep, filename = init_animation(start, goal, path, Obstacles, num_visited)
+
+# Save animation to disk
+save_progress = None
+create_animation(fig, num_frames, filename, show = False, write = True)
+
