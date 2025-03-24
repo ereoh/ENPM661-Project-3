@@ -326,7 +326,7 @@ def astar_search(start, goal, obstacles):
 
 def is_valid_point(x, y, obstacles):
     # Check if point is within canvas bounds and not inside any obstacle
-    if not (2 <= x <= 177 and 2 <= y <= 47):
+    if not (5 <= x <= 174 and 5 <= y <= 44):
         return False
     for obstacle in obstacles:
         if obstacle.is_inside_obstacle(x, y):
@@ -344,8 +344,8 @@ def init_animation(start, goal, path, obstacles, num_visited):
     ax.set_xlim(-10, 190)
     ax.set_ylim(-10, 60)
     # Draw borders (Blue)
-    border_x = [0-1, 0-1, 180, 180, 0-1]
-    border_y = [0-1, 50, 50, 0-1, 0-1]
+    border_x = [4, 4, 175, 175, 4]
+    border_y = [4, 45, 45, 4, 4]
     ax.plot(border_x, border_y, linewidth=2, c='b')
 
     # draw obstacles (Blue)
@@ -454,24 +454,29 @@ Obstacles = [E_obstacle, N_obstacle, P_Obstacle, M_Obstacle, Six_Obstacle_1, Six
 
 # Request start and goal points from the command line
 try:
-    print("Maze: Bottom left corner is (2, 2) and top right corner is (177, 47)")
-    start_x, start_y = map(int, input("Enter start point (x y): ").split())
-    goal_x, goal_y = map(int, input("Enter goal point (x y): ").split())
+    print("Maze: Bottom left corner is (5, 5) and top right corner is (174, 44)")
+
+    valid = False
+    while not valid:
+        start_x, start_y = map(int, input("Enter start point (x y): ").split())
+        if is_valid_point(start_x, start_y, Obstacles):
+            valid = True
+        else:
+            print("Invalid start point. It is either out of bounds or inside an obstacle.")
+    
+    valid = False
+    while not valid:
+        goal_x, goal_y = map(int, input("Enter goal point (x y): ").split())
+        if is_valid_point(goal_x, goal_y, Obstacles):
+            valid = True
+        else:
+            print("Invalid goal point. It is either out of bounds or inside an obstacle.")
 except ValueError:
     print("Invalid input. Please enter integer coordinates.")
     sys.exit(1)
 
-# Validate start and goal points
-if not is_valid_point(start_x, start_y, Obstacles):
-    print("Invalid start point. It is either out of bounds or inside an obstacle.")
-    sys.exit(1)
-if not is_valid_point(goal_x, goal_y, Obstacles):
-    print("Invalid goal point. It is either out of bounds or inside an obstacle.")
-    sys.exit(1)
-
 start = (start_x, start_y)
 goal = (goal_x, goal_y)
-
 
 # Perform A Star search and get the path
 path, closed_set = astar_search(start, goal, Obstacles)
