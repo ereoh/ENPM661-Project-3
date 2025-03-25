@@ -301,7 +301,7 @@ def astar_search(start, goal, obstacles, L):
             continue
         visited.add(key)
 
-        if heuristic((x, y), goal_pos) < 0.5:
+        if heuristic((x, y), goal_pos) < 1.5:
             goal_node = current
             break
 
