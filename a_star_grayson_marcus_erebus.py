@@ -2,7 +2,7 @@ import numpy as np
 from collections import deque
 import sys
 import heapq
-
+import math
 import matplotlib.pyplot as plt
 import matplotlib.image
 import matplotlib.animation as animation
@@ -14,6 +14,10 @@ red = (0, 0, 255)
 blue = (255, 0, 0)
 green = (0, 255, 0)
 grey = (128, 128, 128)
+
+# define space resolution
+ANGLE_RESOLUTION = 30
+STEP_RESOLUTION = 1
 
 # Base class for obstacles
 class Obstacle:
@@ -262,67 +266,73 @@ class OneObstacle(Obstacle):
         # Check if point is inside bar of 1 shape
         return self.bar.is_inside_obstacle(x, y)
 
-def astar_search(start, goal, obstacles):
-    # Define possible moves and their costs
-    moves = [(-1, 0, 1.0), (-1, 1, 1.4), (0, 1, 1.0), (1, 1, 1.4),
-             (1, 0, 1.0), (1, -1, 1.4), (0, -1, 1.0), (-1, -1, 1.4)]
+def discretize(x, y, theta, pos_res=STEP_RESOLUTION, angle_res=ANGLE_RESOLUTION):
+    x_d = round(x / pos_res) * pos_res
+    y_d = round(y / pos_res) * pos_res
+    theta_d = round(theta / angle_res) * angle_res % 360
+    return (x_d, y_d, theta_d)
+
+def astar_search(start, goal, obstacles, L):
+    move_angles = [-60, -30, 0, 30, 60]
+    move_cache = {angle: (L * math.cos(math.radians(angle)),
+                          L * math.sin(math.radians(angle)))
+                  for angle in range(0, 360, ANGLE_RESOLUTION)}
     
-    # Heuristic function to estimate the cost from current node to goal
+    start_node = (*start,)
+    goal_pos = goal[:2]
+    
     def heuristic(a, b):
-        dx = abs(a[0] - b[0])
-        dy = abs(a[1] - b[1])
-        return min(dx, dy) * 1.4 + abs(dx - dy) * 1.0  # Movement cost heuristic
-    
-    # Initialize the open set with the start node
+        return math.hypot(b[0] - a[0], b[1] - a[1])
+
     open_set = []
-    heapq.heappush(open_set, (0, start))
-    C2C = {start: 0}  # Cost from start to current node
-    total_cost = {start: heuristic(start, goal)}  # Estimated cost from start to goal
-    parent = {}  # To reconstruct the path
-    closed_set = [] # track visited nodes
-    
+    start_key = discretize(*start_node)
+    heapq.heappush(open_set, (0, start_node))
+    C2C = {start_key: 0}
+    total_cost = {start_key: heuristic(start, goal_pos)}
+    parent = {}
+    visited = set()
+
     while open_set:
-        # Get the node with the lowest f_score
         _, current = heapq.heappop(open_set)
-        x, y = current
-        
-        # Mark the current node as visited in closed set
-        closed_set.append(current)
-        
-        # If the goal is reached, exit the loop
-        if current == goal:
+        x, y, theta = current
+        key = discretize(x, y, theta)
+
+        if key in visited:
+            continue
+        visited.add(key)
+
+        if heuristic((x, y), goal_pos) < 0.5:
+            goal_node = current
             break
-        
-        # Explore neighbors
-        for dx, dy, cost in moves:
+
+        for delta_angle in move_angles:
+            new_theta = (theta + delta_angle) % 360
+            move_theta = discretize(0, 0, new_theta)[2]
+            dx, dy = move_cache[move_theta]
             new_x, new_y = x + dx, y + dy
-            new_pos = (new_x, new_y)
-            
-            # Skip if the new position is out of bounds or inside an obstacle
-            if not is_valid_point(new_x, new_y, obstacles):
+            new_key = discretize(new_x, new_y, new_theta)
+
+            if new_key in visited or not is_valid_point(new_x, new_y, obstacles):
                 continue
-            
-            # Calculate the tentative C2C for the new position
-            tentative_C2C = C2C[current] + cost
-            
-            if new_pos not in C2C or tentative_C2C < C2C[new_pos]:
-                # Update the parent, C2C, and total_cost for the new position
-                parent[new_pos] = current
-                C2C[new_pos] = tentative_C2C
-                total_cost[new_pos] = tentative_C2C + heuristic(new_pos, goal)
-                heapq.heappush(open_set, (total_cost[new_pos], new_pos))
-    
-     # Backtrack to reconstruct the path
+
+            tentative_C2C = C2C[key] + L
+            if new_key not in C2C or tentative_C2C < C2C[new_key]:
+                C2C[new_key] = tentative_C2C
+                total_cost[new_key] = tentative_C2C + heuristic((new_x, new_y), goal_pos)
+                heapq.heappush(open_set, (total_cost[new_key], (new_x, new_y, new_theta)))
+                parent[new_key] = key
+
+    # Backtrack using discretized keys
     path = []
-    current = goal
-    while current in parent:
-        path.append(current)
-        current = parent[current]
-    path.reverse() # Reverse the path to get it from start to goal
+    key = discretize(*goal_node)
+    while key in parent:
+        x, y, theta = key
+        path.append((x, y, theta))
+        key = parent[key]
+    path.reverse()
 
     print("Path found!")
-
-    return path, closed_set
+    return path, visited
 
 def is_valid_point(x, y, obstacles):
     # Check if point is within canvas bounds and not inside any obstacle
@@ -435,11 +445,6 @@ def create_animation(fig, num_frames, filename, show=True, write=True):
         )
         print(f"Saved animation to {filename}")
 
-
-# Code starts here
-
-# Initialize Variables
-
 WIDTH = 600
 HEIGHT = 250
 E_obstacle = EObstacle((80, 50), 50, 150)
@@ -455,7 +460,7 @@ Obstacles = [E_obstacle, N_obstacle, P_Obstacle, M_Obstacle, Six_Obstacle_1, Six
 
 # Request start and goal points from the command line
 try:
-    print("Maze: Bottom left corner is (5, 5) and top right corner is (174, 44)")
+    print("Maze: Bottom left corner is ( 5 , 5 ) and top right corner is (", (WIDTH - 6), ",", (HEIGHT - 6),")")
 
     valid = False
     while not valid:
@@ -476,15 +481,15 @@ except ValueError:
     print("Invalid input. Please enter integer coordinates.")
     sys.exit(1)
 
-start = (start_x, start_y)
-goal = (goal_x, goal_y)
+start = (start_x, start_y, 0)
+goal = (goal_x, goal_y, 0)
 
 # Perform A Star search and get the path
-path, closed_set = astar_search(start, goal, Obstacles)
+path, closed_set = astar_search(start, goal, Obstacles, 1)
 
 # convert to numpy arrays for animation
 np_path = np.array(path)
-np_closed_set = np.array(closed_set)
+np_closed_set = np.array(list(closed_set), dtype=float)
 
 num_visited = np_closed_set.shape[0]
 path_length = len(path)
