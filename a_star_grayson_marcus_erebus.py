@@ -158,11 +158,11 @@ class PObstacle(Obstacle):
         ])
         self.head = LineDefinedObstacle([
             (origin[0] + 6, origin[1] + height),
-            (origin[0] + 6, origin[1] + height - 16),
-            (origin[0] + width - 6, origin[1] + height - 16),
+            (origin[0] + 6, origin[1] + height - 50),
+            (origin[0] + width - 6, origin[1] + height - 50),
             (origin[0] + width - 6, origin[1] + height)
         ])
-        self.circle = Circle((origin[0] + width - 6, origin[1] + height - 8), 8)
+        self.circle = Circle((origin[0] + width - 6, origin[1] + height - 25), 25)
 
     def is_inside_obstacle(self, x, y):
         # Check if point is inside any part of P shape
@@ -326,7 +326,7 @@ def astar_search(start, goal, obstacles):
 
 def is_valid_point(x, y, obstacles):
     # Check if point is within canvas bounds and not inside any obstacle
-    if not (5 <= x <= 174 and 5 <= y <= 44):
+    if not (5 <= x <= (WIDTH - 6) and 5 <= y <= (HEIGHT - 6)):
         return False
     for obstacle in obstacles:
         if obstacle.is_inside_obstacle(x, y):
@@ -341,11 +341,11 @@ def init_animation(start, goal, path, obstacles, num_visited):
     # draw background
     fig, ax = plt.subplots(figsize=(15, 6))
     fig.suptitle(f'A-Star Search from {start} to {goal}')
-    ax.set_xlim(-10, 190)
-    ax.set_ylim(-10, 60)
+    ax.set_xlim(-10, WIDTH + 10)
+    ax.set_ylim(-10, HEIGHT + 10)
     # Draw borders (Blue)
-    border_x = [4, 4, 175, 175, 4]
-    border_y = [4, 45, 45, 4, 4]
+    border_x = [4, 4, WIDTH-5, WIDTH-5, 4]
+    border_y = [4, HEIGHT-5, HEIGHT-5, 4, 4]
     ax.plot(border_x, border_y, linewidth=2, c='b')
 
     # draw obstacles (Blue)
@@ -439,15 +439,16 @@ def create_animation(fig, num_frames, filename, show=True, write=True):
 # Code starts here
 
 # Initialize Variables
-WIDTH = 180
-HEIGHT = 50
-E_obstacle = EObstacle((10, 10), 20, 30)
-N_obstacle = NObstacle((35, 10), 20, 30)
-P_Obstacle = PObstacle((60, 10), 20, 30)
-M_Obstacle = MObstacle((85, 10), 20, 30)
-Six_Obstacle_1 = SixObstacle((110, 10), 15, 30)
-Six_Obstacle_2 = SixObstacle((130, 10), 15, 30)
-One_Obstacle = OneObstacle((150, 10), 10, 30)
+
+WIDTH = 600
+HEIGHT = 250
+E_obstacle = EObstacle((80, 50), 50, 150)
+N_obstacle = NObstacle((150, 50), 50, 150)
+P_Obstacle = PObstacle((220, 50), 50, 150)
+M_Obstacle = MObstacle((300, 50), 50, 150)
+Six_Obstacle_1 = SixObstacle((370, 50), 50, 150)
+Six_Obstacle_2 = SixObstacle((440, 50), 50, 150)
+One_Obstacle = OneObstacle((510, 50), 30, 150)
 
 Obstacles = [E_obstacle, N_obstacle, P_Obstacle, M_Obstacle, Six_Obstacle_1, Six_Obstacle_2, One_Obstacle]
 
@@ -495,4 +496,3 @@ fig, exploration_draw, path_line, cbar, cstep, filename = init_animation(start, 
 # Save animation to disk
 save_progress = None
 create_animation(fig, num_frames, filename, show = False, write = True)
-
