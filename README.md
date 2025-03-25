@@ -48,6 +48,7 @@ To run the solver, just run the `phase1.py` file:
 ```bash
 python phase1.py
 ```
+Then, enter in start and goal positions in the format: `x y theta`
 
 ## Requirements
 - Givens
