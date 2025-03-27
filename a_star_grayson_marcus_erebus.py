@@ -301,7 +301,7 @@ def astar_search(start, goal, obstacles, L):
             continue
         visited.add(key)
 
-        if heuristic((x, y), goal_pos) < 0.5:
+        if heuristic((x, y), goal_pos) < 1.5:
             goal_node = current
             break
 
@@ -372,11 +372,24 @@ def init_animation(start, goal, path, obstacles, num_visited):
     # draw goal (Red)
     ax.scatter(goal[0], goal[1], marker='s', c='red')
 
+    """Beginning to try implementing vectors into animation"""
+    """
+    # Initialize exploration and path artists for vectors
+    exploration_x, exploration_y, exploration_u, exploration_v = [], [], [], []
+    
+
+    # Initialize path vectors (same idea as exploration)
+    path_x, path_y, path_u, path_v = [], [], [], []
+    path_line = ax.quiver(path_x, path_y, path_u, path_v, angles='xy', scale_units='xy', scale=1, color='#ff29f8')
+    """
+    
     # Init exploration and path artists
     exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
     exploration_draw.set_clim(0, num_visited) # colorbar init
     path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
+    
 
+    
     # Init Colorbar
     cstep = max(1, int(num_visited / 10)) # want 10 ticks along colorbar
     cbar = fig.colorbar(exploration_draw, ax=ax)
@@ -397,7 +410,8 @@ def update_animation(i):
     # then path
     else:
         idx = i - np_closed_set.shape[0]
-        path_line.set_data(np_path[:idx].T)
+        #path_line.set_data(np_path[:idx].T)
+        path_line.set_data(np_path[:idx, 0], np_path[:idx, 1])
 
     return exploration_draw, path_line,
 
@@ -415,9 +429,12 @@ def create_animation(fig, num_frames, filename, show=True, write=True):
         blit=True, 
     )
 
-    if show:
-        plt.show()
+    print("display animation")
+    plt.show()
 
+    return ani
+
+    """
     if write:
 
         save_progress = tqdm(total = num_frames, desc = "Saving Animation", unit='frames')
@@ -444,6 +461,7 @@ def create_animation(fig, num_frames, filename, show=True, write=True):
             progress_callback=save_update
         )
         print(f"Saved animation to {filename}")
+    """
 
 WIDTH = 600
 HEIGHT = 250
@@ -489,6 +507,7 @@ path, closed_set = astar_search(start, goal, Obstacles, 1)
 
 # convert to numpy arrays for animation
 np_path = np.array(path)
+print(np_path[0])
 np_closed_set = np.array(list(closed_set), dtype=float)
 
 num_visited = np_closed_set.shape[0]
