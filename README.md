@@ -32,33 +32,29 @@ March 28, 2025
 - [ ] `Proj3_grayson_marcus_erebus.pdf`
     - soure code from `a_star_grayson_marcus_erebus.py`
     - for plagarism checks
-    - outside zip
+    - outside zip file
 
 ## Run This Code
 ---
 
 ### Dependenices
+Dependencies used in this project include: numpy, pygame, heapq, math, and time.
+
 Install the necessary dependencies:
 ```
 pip install -r requirements.txt
 ```
 Or manually install the dependencies:
 ```
-pip install numpy matplotlib tqdm
+pip install numpy pygame
 ```
-
-The exploration and path animatio will be output as `AStar_animation_start_to_goal.mp4` if ffmpeg is available (otherwise will be saved as `AStar_animation_start_to_goal.gif`).
-- ffmpeg is significantly faster than pillow, to install:
-    - Linux: `sudo apt update && sudo apt install ffmpeg`
-    - [GeeksForGeeks: How to Install FFmpeg in Linux?](https://www.geeksforgeeks.org/how-to-install-ffmpeg-in-linux/)
-    - [WikiHow: Easily Download and Install FFmpeg on a Windows PC](https://www.wikihow.com/Install-FFmpeg-on-Windows)
 
 ### Run Solver
-To run the solver, just run the `phase1.py` file:
+To run the solver, just run the `a_star_grayson_marcus_erebus.py` file:
 ```bash
-python phase1.py
+python a_star_grayson_marcus_erebus.py
 ```
-Then, enter in start and goal positions in the format: `x y theta`
+Then, enter in start position, start theta, goal position, and step amount following the format as prompted.
 
 ## Requirements
 - Givens
@@ -66,25 +62,22 @@ Then, enter in start and goal positions in the format: `x y theta`
     - clearance: 5mm?
     - Map: 250x600, same as project 2
         - use half planes, semi-algebriac models
-    - Goal threshold: robot center within 1.5mm radius (any orientation)
+    - Goal threshold: robot center within 1.5 unit radius (any orientation)
     - State threshold: 0.5 xy and 30 degrees
     - Action Space
 - User Input
     - Start: x y theta
     - Goal: x y theta
-    - clearance?
-    - robot radius?
     - step size of robot: magnitude of robot action movement
-- Use A-Star Search
-    - 
-    - forward search
-    - heuristic = Euclidean distance
-    - search space tree for path
-        - generate as 3D space
-        - matrix to store visited nodes
-            - 250/threshold x 600/threshold x (360/30) = 500x1200x12
-            - 1 for visted
-            - empty or zero otherwise
+## Use A-Star Search
+- forward search
+- heuristic = Euclidean distance
+- search space tree for path
+    - generate as 3D space
+    - matrix to store visited nodes
+        - 250/threshold x 600/threshold x (360/30) = 500x1200x12
+        - 1 for visted
+        - empty or zero otherwise
 - Output animation video
     - exploration
     - optimal path
