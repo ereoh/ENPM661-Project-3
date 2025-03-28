@@ -1,5 +1,5 @@
+from collections import namedtuple
 import numpy as np
-from collections import deque
 import sys
 import heapq
 import math
