@@ -67,13 +67,13 @@ Then, enter in start position, start theta, goal position, and step amount follo
     - Action Space
 - User Input
     - Start: x y theta
-    - Goal: x y theta
+    - Goal: x y
     - step size of robot: magnitude of robot action movement
 ## Use A-Star Search
 - forward search
 - heuristic = Euclidean distance
 - search space tree for path
-    - generate as 3D space
+    - generate as 2D space
     - matrix to store visited nodes
         - 250/threshold x 600/threshold x (360/30) = 500x1200x12
         - 1 for visted
