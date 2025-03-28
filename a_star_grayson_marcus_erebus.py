@@ -251,8 +251,8 @@ def astar_search(start, goal, obstacles, L):
 
     # Initialize visited matrix
     VisitedMatrix = [[[0 for _ in range(int(360 / THETA_DISCRETIZATION))] 
-             for _ in range(int(HEIGHT / (POS_DISCRETIZATION * L)))] 
-             for _ in range(int(WIDTH / (POS_DISCRETIZATION * L)))]
+                        for _ in range(int(HEIGHT / (POS_DISCRETIZATION * L)))] 
+                        for _ in range(int(WIDTH / (POS_DISCRETIZATION * L)))]
 
     # Priority queue for A* search
     open_set = [(heuristic(start_x, start_y, goal), 0, start_state)]
@@ -325,7 +325,7 @@ def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
                                  (int(x * SCALE), int((HEIGHT - y) * SCALE)), 
                                  (int(new_x * SCALE), int((HEIGHT - new_y) * SCALE)), 2)
         
-        pygame.draw.rect(screen, (255, 0, 0), (int(path[-1][0]) * SCALE, (HEIGHT - int(path[-1][1])) * SCALE, 5, 5))
+        pygame.draw.rect(screen, blue, (int(path[-1][0]) * SCALE, (HEIGHT - int(path[-1][1])) * SCALE, 5, 5))
         pygame.draw.rect(screen, (255, 0, 255), (int(path[0][0]) * SCALE, (HEIGHT - int(path[0][1])) * SCALE, 5, 5))
 
         pygame.display.flip()
