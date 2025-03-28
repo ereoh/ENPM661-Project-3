@@ -1,6 +1,16 @@
 # Project 3:
 
-Grayson Gilbert, Marcus Hurt, Erebus Oh
+Grayson Gilbert
+UID: 115837461
+Directory ID: ggilbert
+
+Marcus Hurt
+UID:
+Directory ID:
+
+Erebus Oh
+UID: 
+Directory:
 
 ENPM 661, Spring 2025
 
