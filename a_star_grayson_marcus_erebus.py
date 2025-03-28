@@ -373,15 +373,9 @@ def init_animation(start, goal, path, obstacles, num_visited):
     ax.scatter(goal[0], goal[1], marker='s', c='red')
 
     """Beginning to try implementing vectors into animation"""
-    """
-    # Initialize exploration and path artists for vectors
-    exploration_x, exploration_y, exploration_u, exploration_v = [], [], [], []
     
-
-    # Initialize path vectors (same idea as exploration)
-    path_x, path_y, path_u, path_v = [], [], [], []
-    path_line = ax.quiver(path_x, path_y, path_u, path_v, angles='xy', scale_units='xy', scale=1, color='#ff29f8')
-    """
+    # Initialize exploration and path artists for vectors
+    exploration_x, exploration_y, exploration_u, exploration_v = [], [], [], []   
     
     # Init exploration and path artists
     exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
@@ -389,7 +383,6 @@ def init_animation(start, goal, path, obstacles, num_visited):
     path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
     
 
-    
     # Init Colorbar
     cstep = max(1, int(num_visited / 10)) # want 10 ticks along colorbar
     cbar = fig.colorbar(exploration_draw, ax=ax)
@@ -397,13 +390,30 @@ def init_animation(start, goal, path, obstacles, num_visited):
 
     filename = f"AStar_animation_{start[0]}-{start[1]}_to_{goal[0]}-{goal[1]}"
 
-    return fig, exploration_draw, path_line, cbar, cstep, filename
+    return fig, exploration_draw, ax, exploration_x, exploration_y, exploration_u, exploration_v, path_line, cbar, cstep, filename
 
 def update_animation(i):
     # first draw exploration
     if i < num_visited:
-        exploration_draw.set_offsets(np_closed_set[:i])
-        exploration_draw.set_array(np.arange(i))
+
+        x, y, theta = np_closed_set[i, 0], np_closed_set[i, 1], np_closed_set[i, 2]
+        theta_rad = np.radians(theta)
+
+        u = 15 * np.cos(theta_rad)
+        v = 15 * np.sin(theta_rad)
+
+        exploration_x.append(x)
+        exploration_y.append(y)
+        exploration_u.append(u)
+        exploration_v.append(v)
+
+
+        ax.quiver(exploration_x, exploration_y, exploration_u, exploration_v, angles='xy', scale_units='xy', scale=1, color='green', width=0.001)
+
+        
+        #exploration_quiver[0].set_UVC(u,v)
+        #exploration_draw.set_offsets(np_closed_set[:i])
+        #exploration_draw.set_array(np.arange(i))
         cbar.set_ticks(np.arange(0, np_closed_set.shape[0], cstep))
 
         path_line.set_data([],[])
@@ -413,7 +423,7 @@ def update_animation(i):
         #path_line.set_data(np_path[:idx].T)
         path_line.set_data(np_path[:idx, 0], np_path[:idx, 1])
 
-    return exploration_draw, path_line,
+    return ax, path_line,
 
 def save_update(i, total):
     save_progress.update(1)
@@ -507,15 +517,16 @@ path, closed_set = astar_search(start, goal, Obstacles, 1)
 
 # convert to numpy arrays for animation
 np_path = np.array(path)
-print(np_path[0])
+print(np_path[0]) # for test
 np_closed_set = np.array(list(closed_set), dtype=float)
+print(np_closed_set[0]) # for test
 
 num_visited = np_closed_set.shape[0]
 path_length = len(path)
 num_frames = num_visited + path_length
 
 # Animate exploration and path
-fig, exploration_draw, path_line, cbar, cstep, filename = init_animation(start, goal, path, Obstacles, num_visited)
+fig, exploration_draw, ax, exploration_x, exploration_y, exploration_u, exploration_v, path_line, cbar, cstep, filename = init_animation(start, goal, path, Obstacles, num_visited)
 
 # Save animation to disk
 save_progress = None
