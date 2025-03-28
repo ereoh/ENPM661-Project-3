@@ -309,7 +309,7 @@ def draw_obstacles(screen, obstacles):
             if not is_valid_point(x, y, obstacles):
                 screen.set_at((int(x * SCALE), int((HEIGHT - y) * SCALE)), grey)
 
-def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
+def animate_astar(screen, obstacles, path, exploration_order, L):
     # Animate the A* search process
     move_angles = [-60, -30, 0, 30, 60]
     for node in exploration_order:
@@ -338,7 +338,7 @@ def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
                          (int(x2 * SCALE), int((HEIGHT - y2) * SCALE)), 3)
     pygame.display.flip()
 
-def visualize_astar(obstacles, path, exploration_order, move_cache, L):
+def visualize_astar(obstacles, path, exploration_order, L):
     # Visualize the A* search process
     pygame.init()
     screen = pygame.display.set_mode((WIDTH * SCALE, HEIGHT * SCALE))
@@ -349,7 +349,7 @@ def visualize_astar(obstacles, path, exploration_order, move_cache, L):
     
 
     pygame.display.flip()
-    animate_astar(screen, obstacles, path, exploration_order, move_cache, L)
+    animate_astar(screen, obstacles, path, exploration_order, L)
     running = True
     while running:
         for event in pygame.event.get():
@@ -433,6 +433,4 @@ if path is None:
 else:
     print("Path found to the goal.")
 
-move_cache = {angle: (math.cos(math.radians(angle)), math.sin(math.radians(angle))) 
-              for angle in range(0, 360, THETA_DISCRETIZATION)}
-visualize_astar(Obstacles, path, exploration_order, move_cache, L)
+visualize_astar(Obstacles, path, exploration_order, L)
