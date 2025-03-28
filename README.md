@@ -52,7 +52,7 @@ pip install numpy pygame
 ### Run Solver
 To run the solver, just run the `a_star_grayson_marcus_erebus.py` file:
 ```bash
-python a_star_grayson_marcus_erebus.py
+python3 a_star_grayson_marcus_erebus.py
 ```
 Then, enter in start position, start theta, goal position, and step amount following the format as prompted.
 
