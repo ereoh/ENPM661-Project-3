@@ -332,14 +332,9 @@ def astar_search(start, goal, obstacles, L):
         # Add to exploration order only if it hasn't been visited before
         exploration_order.append(current)
 
-<<<<<<< HEAD
-        if heuristic((x, y), goal_pos) < 1.5:
-            goal_node = current
-=======
         # Check if the goal is reached (ignore orientation)
         if heuristic((x, y), goal_pos) < 1.5:
             goal_node = (x, y, theta)  # Use the current node as the goal node
->>>>>>> origin/Marcus
             break
 
         # Explore neighbors
@@ -376,147 +371,6 @@ def astar_search(start, goal, obstacles, L):
     path.reverse()
 
     print("Path found!")
-<<<<<<< HEAD
-    return path, visited
-
-def is_valid_point(x, y, obstacles):
-    # Check if point is within canvas bounds and not inside any obstacle
-    if not (5 <= x <= (WIDTH - 6) and 5 <= y <= (HEIGHT - 6)):
-        return False
-    for obstacle in obstacles:
-        if obstacle.is_inside_obstacle(x, y):
-            return False
-    return True
-
-## Animation Functions
-
-def init_animation(start, goal, path, obstacles, num_visited):
-    print("Initializing animation")
-
-    # draw background
-    fig, ax = plt.subplots(figsize=(15, 6))
-    fig.suptitle(f'A-Star Search from {start} to {goal}')
-    ax.set_xlim(-10, WIDTH + 10)
-    ax.set_ylim(-10, HEIGHT + 10)
-    # Draw borders (Blue)
-    border_x = [4, 4, WIDTH-5, WIDTH-5, 4]
-    border_y = [4, HEIGHT-5, HEIGHT-5, 4, 4]
-    ax.plot(border_x, border_y, linewidth=2, c='b')
-
-    # draw obstacles (Blue)
-    for i in range(WIDTH):
-        for j in range(HEIGHT):
-            for obstacle in obstacles:
-                # Color pixel if inside obstacle
-                if obstacle.is_inside_obstacle(i, j):
-                    ax.plot(i, j, marker='s', color='blue')
-
-    # draw start (Green)
-    ax.scatter(start[0], start[1], marker='s', c='#7dffa0')
-
-    # draw goal (Red)
-    ax.scatter(goal[0], goal[1], marker='s', c='red')
-
-    """Beginning to try implementing vectors into animation"""
-    
-    # Initialize exploration and path artists for vectors
-    exploration_x, exploration_y, exploration_u, exploration_v = [], [], [], []   
-    
-    # Init exploration and path artists
-    exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
-    exploration_draw.set_clim(0, num_visited) # colorbar init
-    path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
-    
-
-    # Init Colorbar
-    cstep = max(1, int(num_visited / 10)) # want 10 ticks along colorbar
-    cbar = fig.colorbar(exploration_draw, ax=ax)
-    cbar.set_label('Explored Order')
-
-    filename = f"AStar_animation_{start[0]}-{start[1]}_to_{goal[0]}-{goal[1]}"
-
-    return fig, exploration_draw, ax, exploration_x, exploration_y, exploration_u, exploration_v, path_line, cbar, cstep, filename
-
-def update_animation(i):
-    # first draw exploration
-    if i < num_visited:
-
-        x, y, theta = np_closed_set[i, 0], np_closed_set[i, 1], np_closed_set[i, 2]
-        theta_rad = np.radians(theta)
-
-        u = 15 * np.cos(theta_rad)
-        v = 15 * np.sin(theta_rad)
-
-        exploration_x.append(x)
-        exploration_y.append(y)
-        exploration_u.append(u)
-        exploration_v.append(v)
-
-
-        ax.quiver(exploration_x, exploration_y, exploration_u, exploration_v, angles='xy', scale_units='xy', scale=1, color='green', width=0.001)
-
-        
-        #exploration_draw.set_offsets(np_closed_set[:i])
-        #exploration_draw.set_array(np.arange(i))
-        #cbar.set_ticks(np.arange(0, np_closed_set.shape[0], cstep))
-
-        path_line.set_data([],[])
-    # then path
-    else:
-        idx = i - np_closed_set.shape[0]
-        #path_line.set_data(np_path[:idx].T)
-        path_line.set_data(np_path[:idx, 0], np_path[:idx, 1])
-
-    return ax, path_line,
-
-def save_update(i, total):
-    save_progress.update(1)
-
-def create_animation(fig, num_frames, filename, show=True, write=True):
-    global save_progress
-    # generate animation
-    ani = FuncAnimation(
-        fig, 
-        update_animation, 
-        frames=num_frames, 
-        interval=30, 
-        blit=True, 
-    )
-
-    print("display animation")
-    plt.show()
-
-    return ani
-
-    """
-    if write:
-
-        save_progress = tqdm(total = num_frames, desc = "Saving Animation", unit='frames')
-        # save as MP4 or GIF
-        available_writers = animation.writers.list()
-        available_writers = animation.writers.list()
-
-        writer = 'ffmpeg'
-
-        if 'ffmpeg' in available_writers:
-            filename += ".mp4"
-        else:
-            filename += ".gif"
-            writer = "pillow"
-
-        # write animation as gif to disk
-        if writer == 'pillow':
-            print("Warning: ffmpeg not found! Using pillow and saving as GIF. This is significantly slower.")
-        
-        ani.save(
-            filename, 
-            writer=writer, 
-            fps=60, 
-            progress_callback=save_update
-        )
-        print(f"Saved animation to {filename}")
-    """
-=======
     return path, visited, exploration_order
 
 def draw_obstacles(screen, obstacles):
@@ -550,12 +404,14 @@ def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
             dx = L * math.cos(math.radians(new_theta))
             dy = L * math.sin(math.radians(new_theta))
             new_x, new_y = x + dx, y + dy
->>>>>>> origin/Marcus
 
             if is_valid_point(new_x, new_y, obstacles):
                 pygame.draw.line(screen, green, 
                                  (int(x * SCALE), int((HEIGHT - y) * SCALE)), 
                                  (int(new_x * SCALE), int((HEIGHT - new_y) * SCALE)), 2)  # Scale coordinates
+        
+        pygame.draw.rect(screen, (255, 0, 0), (int(path[-1][0]) * SCALE, (HEIGHT - int(path[-1][1])) * SCALE, 5, 5))
+        pygame.draw.rect(screen, (255, 0, 255), (int(path[0][0]) * SCALE, (HEIGHT - int(path[0][1])) * SCALE, 5, 5))
 
         pygame.display.flip()
         pygame.time.delay(10)  # Delay for animation effect
@@ -585,11 +441,17 @@ def visualize_astar(obstacles, path, exploration_order, move_cache, L):
     screen.fill((255, 255, 255))
     # Draw obstacles on the screen
     draw_obstacles(screen, obstacles)
+    
+
     pygame.display.flip()
+    
+    
 
     # Animate the A* search process
     animate_astar(screen, obstacles, path, exploration_order, move_cache, L)
 
+    
+    
     # Keep the visualization open until the user closes it
     running = True
     while running:
@@ -646,31 +508,19 @@ start = (start_x, start_y, 0)
 goal = (goal_x, goal_y, 0)
 
 # Perform A* search and get the path
-path, closed_set, exploration_order = astar_search(start, goal, Obstacles, 5)
+path, closed_set, exploration_order = astar_search(start, goal, Obstacles, 10) # Changed step from 5 to 10
+print(len(exploration_order))
+print(path[0])
 
 # Visualize the A* search process and the final path
 move_cache = {angle: (math.cos(math.radians(angle)), math.sin(math.radians(angle))) 
               for angle in range(0, 360, ANGLE_RESOLUTION)}
-visualize_astar(Obstacles, path, exploration_order, move_cache, 5)
+visualize_astar(Obstacles, path, exploration_order, move_cache, 7)
 
 # Convert to numpy arrays for animation
 np_path = np.array(path)
-print(np_path[0]) # for test
 np_closed_set = np.array(list(closed_set), dtype=float)
-np.save('closed_set.npy', np_closed_set)
-np.savetxt('closed_set.txt', np_closed_set, delimiter=",")
-print(np_closed_set[0]) # for test
 
 num_visited = np_closed_set.shape[0]
 path_length = len(path)
 num_frames = num_visited + path_length
-<<<<<<< HEAD
-
-# Animate exploration and path
-fig, exploration_draw, ax, exploration_x, exploration_y, exploration_u, exploration_v, path_line, cbar, cstep, filename = init_animation(start, goal, path, Obstacles, num_visited)
-
-# Save animation to disk
-save_progress = None
-create_animation(fig, num_frames, filename, show = False, write = True)
-=======
->>>>>>> origin/Marcus
