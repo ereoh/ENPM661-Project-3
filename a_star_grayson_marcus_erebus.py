@@ -3,11 +3,7 @@ from collections import deque
 import sys
 import heapq
 import math
-import matplotlib.pyplot as plt
-import matplotlib.image
-import matplotlib.animation as animation
-from matplotlib.animation import FuncAnimation
-from tqdm import tqdm
+import pygame
 
 # Define colors
 red = (0, 0, 255)
@@ -17,7 +13,14 @@ grey = (128, 128, 128)
 
 # define space resolution
 ANGLE_RESOLUTION = 30
-STEP_RESOLUTION = 1
+STEP_RESOLUTION = 0.5
+
+# Map Width and Height
+WIDTH = 600
+HEIGHT = 250
+
+# Scaling factor for the animation
+SCALE = 3  # Increase the size of the animation by a factor of 2
 
 # Base class for obstacles
 class Obstacle:
@@ -27,7 +30,6 @@ class Obstacle:
 # Class to define line constraints for a convex polygon
 class LineDefinedObstacle:
     def __init__(self, vertices):
-
         self.lines = self.compute_line_constraints(vertices)
 
     def compute_line_constraints(self, vertices):
@@ -135,9 +137,9 @@ class NObstacle(Obstacle):
         ])
         self.diagonal_bar = LineDefinedObstacle([
             (origin[0] + 6, origin[1] + height),
-            (origin[0] + 6, origin[1] + height - 6),
+            (origin[0] + 6, origin[1] + height - 20),
             (origin[0] + width - 6, origin[1]),
-            (origin[0] + width - 6, origin[1] + 6)
+            (origin[0] + width - 6, origin[1] + 20)
         ])
     
     def is_inside_obstacle(self, x, y):
@@ -196,15 +198,15 @@ class MObstacle(Obstacle):
         ])
         self.left_diagonal = LineDefinedObstacle([
             (origin[0] + 6, origin[1] + height),
-            (origin[0] + 6, origin[1] + height - 6),
+            (origin[0] + 6, origin[1] + height - 20),
             (origin[0] + width // 2, origin[1] + height // 2),
-            (origin[0] + width // 2, origin[1] + height // 2 + 6)
+            (origin[0] + width // 2, origin[1] + height // 2 + 20)
         ])
         self.right_diagonal = LineDefinedObstacle([
             (origin[0] + width - 6, origin[1] + height),
-            (origin[0] + width - 6, origin[1] + height - 6),
+            (origin[0] + width - 6, origin[1] + height - 20),
             (origin[0] + width // 2, origin[1] + height // 2),
-            (origin[0] + width // 2, origin[1] + height // 2 + 6)
+            (origin[0] + width // 2, origin[1] + height // 2 + 20)
         ])
     
     def is_inside_obstacle(self, x, y):
@@ -272,195 +274,207 @@ def discretize(x, y, theta, pos_res=STEP_RESOLUTION, angle_res=ANGLE_RESOLUTION)
     theta_d = round(theta / angle_res) * angle_res % 360
     return (x_d, y_d, theta_d)
 
+def is_valid_point(x, y, obstacles):
+    """
+    Check if a point is within canvas bounds and not inside any obstacle.
+    """
+    # Check canvas bounds
+    if not (5 <= x <= (WIDTH - 6) and 5 <= y <= (HEIGHT - 6)):
+        return False
+
+    # Check if the point is inside any obstacle
+    for obstacle in obstacles:
+        if obstacle.is_inside_obstacle(x, y):
+            return False
+
+    return True
+
 def astar_search(start, goal, obstacles, L):
+    """
+    Perform A* search to find the shortest path from start to goal.
+    Returns the path, visited matrix, and the order of exploration.
+    """
     move_angles = [-60, -30, 0, 30, 60]
     move_cache = {angle: (L * math.cos(math.radians(angle)),
                           L * math.sin(math.radians(angle)))
                   for angle in range(0, 360, ANGLE_RESOLUTION)}
-    
-    start_node = (*start,)
-    goal_pos = goal[:2]
-    
+
+    start_node = discretize(*start)  # Ensure start is discretized
+    goal_node = discretize(goal[0], goal[1], 0)  # Discretize goal, ignoring orientation
+    goal_pos = goal_node[:2]
+
     def heuristic(a, b):
+        """Calculate Euclidean distance as the heuristic."""
         return math.hypot(b[0] - a[0], b[1] - a[1])
 
     open_set = []
-    start_key = discretize(*start_node)
     heapq.heappush(open_set, (0, start_node))
-    C2C = {start_key: 0}
-    total_cost = {start_key: heuristic(start, goal_pos)}
+    C2C = {start_node: 0}
+    total_cost = {start_node: heuristic(start_node, goal_pos)}
     parent = {}
-    visited = set()
+    visited = np.zeros((500, 1200, 12), dtype=bool)  # 3D matrix for visited nodes
+    exploration_order = []  # Track the order of exploration
 
     while open_set:
         _, current = heapq.heappop(open_set)
         x, y, theta = current
-        key = discretize(x, y, theta)
+        key = discretize(x, y, theta)  # Ensure current node is discretized
 
-        if key in visited:
+        # Convert discretized coordinates to matrix indices
+        x_idx = int(x * 2)  # Scale x to fit 1200
+        y_idx = int(y * 2)  # Scale y to fit 500
+        theta_idx = int(theta / ANGLE_RESOLUTION)
+
+        if visited[y_idx, x_idx, theta_idx]:
             continue
-        visited.add(key)
+        visited[y_idx, x_idx, theta_idx] = True
 
+        # Add to exploration order only if it hasn't been visited before
+        exploration_order.append(current)
+
+        # Check if the goal is reached (ignore orientation)
         if heuristic((x, y), goal_pos) < 1.5:
-            goal_node = current
+            goal_node = (x, y, theta)  # Use the current node as the goal node
             break
 
+        # Explore neighbors
         for delta_angle in move_angles:
             new_theta = (theta + delta_angle) % 360
-            move_theta = discretize(0, 0, new_theta)[2]
-            dx, dy = move_cache[move_theta]
+            dx, dy = move_cache[new_theta]
             new_x, new_y = x + dx, y + dy
-            new_key = discretize(new_x, new_y, new_theta)
+            new_key = discretize(new_x, new_y, new_theta)  # Discretize new node
 
-            if new_key in visited or not is_valid_point(new_x, new_y, obstacles):
+            # Convert new discretized coordinates to matrix indices
+            new_x_idx = int(new_key[0] * 2)
+            new_y_idx = int(new_key[1] * 2)
+            new_theta_idx = int(new_key[2] / ANGLE_RESOLUTION)
+
+            if (new_x_idx < 0 or new_x_idx >= 1200 or
+                new_y_idx < 0 or new_y_idx >= 500 or
+                visited[new_y_idx, new_x_idx, new_theta_idx] or
+                not is_valid_point(new_key[0], new_key[1], obstacles)):
                 continue
 
             tentative_C2C = C2C[key] + L
             if new_key not in C2C or tentative_C2C < C2C[new_key]:
                 C2C[new_key] = tentative_C2C
-                total_cost[new_key] = tentative_C2C + heuristic((new_x, new_y), goal_pos)
-                heapq.heappush(open_set, (total_cost[new_key], (new_x, new_y, new_theta)))
+                total_cost[new_key] = tentative_C2C + heuristic(new_key, goal_pos)
+                heapq.heappush(open_set, (total_cost[new_key], new_key))
                 parent[new_key] = key
 
-    # Backtrack using discretized keys
+    # Backtrack to construct the path
     path = []
-    key = discretize(*goal_node)
+    key = goal_node
     while key in parent:
-        x, y, theta = key
-        path.append((x, y, theta))
+        path.append(key)
         key = parent[key]
     path.reverse()
 
     print("Path found!")
-    return path, visited
+    return path, visited, exploration_order
 
-def is_valid_point(x, y, obstacles):
-    # Check if point is within canvas bounds and not inside any obstacle
-    if not (5 <= x <= (WIDTH - 6) and 5 <= y <= (HEIGHT - 6)):
-        return False
-    for obstacle in obstacles:
-        if obstacle.is_inside_obstacle(x, y):
-            return False
-    return True
+def draw_obstacles(screen, obstacles):
+    """
+    Draw obstacles on the pygame screen using the is_valid_point function.
+    Each pixel is checked to determine if it is part of an obstacle.
+    """
+    for x in range(WIDTH):
+        for y in range(HEIGHT):
+            # Flip y-axis for pygame and check if the point is invalid
+            if not is_valid_point(x, y, obstacles):  # No need to flip y here
+                screen.set_at((int(x * SCALE), int((HEIGHT - y) * SCALE)), grey)  # Flip y for rendering
 
-## Animation Functions
+def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
+    """
+    Animate the A* search process, preserving the order of exploration.
+    - Visited nodes are marked with blue dots in the order they are explored.
+    - Valid moves from each node are drawn as green vectors (lines) at angles -60, -30, 0, 30, and 60 degrees.
+    - The final path is drawn in red.
+    """
+    move_angles = [-60, -30, 0, 30, 60]  # Define the possible move angles
 
-def init_animation(start, goal, path, obstacles, num_visited):
-    print("Initializing animation")
+    for node in exploration_order:
+        x, y, theta = node
+        # Mark visited nodes with blue dots
+        pygame.draw.circle(screen, blue, (int(x * SCALE), int((HEIGHT - y) * SCALE)), 2)
 
-    # draw background
-    fig, ax = plt.subplots(figsize=(15, 6))
-    fig.suptitle(f'A-Star Search from {start} to {goal}')
-    ax.set_xlim(-10, WIDTH + 10)
-    ax.set_ylim(-10, HEIGHT + 10)
-    # Draw borders (Blue)
-    border_x = [4, 4, WIDTH-5, WIDTH-5, 4]
-    border_y = [4, HEIGHT-5, HEIGHT-5, 4, 4]
-    ax.plot(border_x, border_y, linewidth=2, c='b')
+        # Draw valid moves as green lines (vectors)
+        for delta_angle in move_angles:
+            new_theta = (theta + delta_angle) % 360
+            dx = L * math.cos(math.radians(new_theta))
+            dy = L * math.sin(math.radians(new_theta))
+            new_x, new_y = x + dx, y + dy
 
-    # draw obstacles (Blue)
-    for i in range(WIDTH):
-        for j in range(HEIGHT):
-            for obstacle in obstacles:
-                # Color pixel if inside obstacle
-                if obstacle.is_inside_obstacle(i, j):
-                    ax.plot(i, j, marker='s', color='blue')
+            if is_valid_point(new_x, new_y, obstacles):
+                pygame.draw.line(screen, green, 
+                                 (int(x * SCALE), int((HEIGHT - y) * SCALE)), 
+                                 (int(new_x * SCALE), int((HEIGHT - new_y) * SCALE)), 2)  # Scale coordinates
 
-    # draw start (Green)
-    ax.scatter(start[0], start[1], marker='s', c='#7dffa0')
+        pygame.display.flip()
+        pygame.time.delay(10)  # Delay for animation effect
 
-    # draw goal (Red)
-    ax.scatter(goal[0], goal[1], marker='s', c='red')
+    # Draw the final path in red
+    for i in range(len(path) - 1):
+        x1, y1, _ = path[i]
+        x2, y2, _ = path[i + 1]
+        pygame.draw.line(screen, red, 
+                         (int(x1 * SCALE), int((HEIGHT - y1) * SCALE)), 
+                         (int(x2 * SCALE), int((HEIGHT - y2) * SCALE)), 3)  # Scale coordinates
+    pygame.display.flip()
 
-    # Init exploration and path artists
-    exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
-    exploration_draw.set_clim(0, num_visited) # colorbar init
-    path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
+def visualize_astar(obstacles, path, exploration_order, move_cache, L):
+    """
+    Visualize the A* search process and the final path using pygame.
+    - Initializes the pygame screen.
+    - Draws the obstacles on the map.
+    - Animates the A* search process and the final path.
+    """
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH * SCALE, HEIGHT * SCALE))  # Scale the window size
+    pygame.display.set_caption("A* Pathfinding Animation")
+    clock = pygame.time.Clock()
 
-    # Init Colorbar
-    cstep = max(1, int(num_visited / 10)) # want 10 ticks along colorbar
-    cbar = fig.colorbar(exploration_draw, ax=ax)
-    cbar.set_label('Explored Order')
+    # Fill the screen with a white background
+    screen.fill((255, 255, 255))
+    # Draw obstacles on the screen
+    draw_obstacles(screen, obstacles)
+    pygame.display.flip()
 
-    filename = f"AStar_animation_{start[0]}-{start[1]}_to_{goal[0]}-{goal[1]}"
+    # Animate the A* search process
+    animate_astar(screen, obstacles, path, exploration_order, move_cache, L)
 
-    return fig, exploration_draw, path_line, cbar, cstep, filename
+    # Keep the visualization open until the user closes it
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        clock.tick(30)
 
-def update_animation(i):
-    # first draw exploration
-    if i < num_visited:
-        exploration_draw.set_offsets(np_closed_set[:i])
-        exploration_draw.set_array(np.arange(i))
-        cbar.set_ticks(np.arange(0, np_closed_set.shape[0], cstep))
+    pygame.quit()
 
-        path_line.set_data([],[])
-    # then path
-    else:
-        idx = i - np_closed_set.shape[0]
-        path_line.set_data(np_path[:idx].T)
+# Constants for obstacle dimensions
+E_WIDTH, E_HEIGHT = 50, 150
+N_WIDTH, N_HEIGHT = 50, 150
+P_WIDTH, P_HEIGHT = 50, 150
+M_WIDTH, M_HEIGHT = 50, 150
+SIX_WIDTH, SIX_HEIGHT = 50, 150
+ONE_WIDTH, ONE_HEIGHT = 30, 150
 
-    return exploration_draw, path_line,
-
-def save_update(i, total):
-    save_progress.update(1)
-
-def create_animation(fig, num_frames, filename, show=True, write=True):
-    global save_progress
-    # generate animation
-    ani = FuncAnimation(
-        fig, 
-        update_animation, 
-        frames=num_frames, 
-        interval=30, 
-        blit=True, 
-    )
-
-    if show:
-        plt.show()
-
-    if write:
-
-        save_progress = tqdm(total = num_frames, desc = "Saving Animation", unit='frames')
-        # save as MP4 or GIF
-        available_writers = animation.writers.list()
-        available_writers = animation.writers.list()
-
-        writer = 'ffmpeg'
-
-        if 'ffmpeg' in available_writers:
-            filename += ".mp4"
-        else:
-            filename += ".gif"
-            writer = "pillow"
-
-        # write animation as gif to disk
-        if writer == 'pillow':
-            print("Warning: ffmpeg not found! Using pillow and saving as GIF. This is significantly slower.")
-        
-        ani.save(
-            filename, 
-            writer=writer, 
-            fps=60, 
-            progress_callback=save_update
-        )
-        print(f"Saved animation to {filename}")
-
-WIDTH = 600
-HEIGHT = 250
-E_obstacle = EObstacle((80, 50), 50, 150)
-N_obstacle = NObstacle((150, 50), 50, 150)
-P_Obstacle = PObstacle((220, 50), 50, 150)
-M_Obstacle = MObstacle((300, 50), 50, 150)
-Six_Obstacle_1 = SixObstacle((370, 50), 50, 150)
-Six_Obstacle_2 = SixObstacle((440, 50), 50, 150)
-One_Obstacle = OneObstacle((510, 50), 30, 150)
+# Initialize obstacles
+E_obstacle = EObstacle((80, 50), E_WIDTH, E_HEIGHT)
+N_obstacle = NObstacle((150, 50), N_WIDTH, N_HEIGHT)
+P_Obstacle = PObstacle((220, 50), P_WIDTH, P_HEIGHT)
+M_Obstacle = MObstacle((300, 50), M_WIDTH, M_HEIGHT)
+Six_Obstacle_1 = SixObstacle((370, 50), SIX_WIDTH, SIX_HEIGHT)
+Six_Obstacle_2 = SixObstacle((440, 50), SIX_WIDTH, SIX_HEIGHT)
+One_Obstacle = OneObstacle((510, 50), ONE_WIDTH, ONE_HEIGHT)
 
 Obstacles = [E_obstacle, N_obstacle, P_Obstacle, M_Obstacle, Six_Obstacle_1, Six_Obstacle_2, One_Obstacle]
 
-
 # Request start and goal points from the command line
 try:
-    print("Maze: Bottom left corner is ( 5 , 5 ) and top right corner is (", (WIDTH - 6), ",", (HEIGHT - 6),")")
+    print("Maze: Bottom left corner is (5, 5) and top right corner is (", (WIDTH - 6), ",", (HEIGHT - 6), ")")
 
     valid = False
     while not valid:
@@ -468,15 +482,15 @@ try:
         if is_valid_point(start_x, start_y, Obstacles):
             valid = True
         else:
-            print("Invalid start point. It is either out of bounds or inside an obstacle.")
-    
+            print("Invalid start point. Ensure it is within bounds and not inside an obstacle.")
+
     valid = False
     while not valid:
         goal_x, goal_y = map(int, input("Enter goal point (x y): ").split())
         if is_valid_point(goal_x, goal_y, Obstacles):
             valid = True
         else:
-            print("Invalid goal point. It is either out of bounds or inside an obstacle.")
+            print("Invalid goal point. Ensure it is within bounds and not inside an obstacle.")
 except ValueError:
     print("Invalid input. Please enter integer coordinates.")
     sys.exit(1)
@@ -484,20 +498,18 @@ except ValueError:
 start = (start_x, start_y, 0)
 goal = (goal_x, goal_y, 0)
 
-# Perform A Star search and get the path
-path, closed_set = astar_search(start, goal, Obstacles, 1)
+# Perform A* search and get the path
+path, closed_set, exploration_order = astar_search(start, goal, Obstacles, 5)
 
-# convert to numpy arrays for animation
+# Visualize the A* search process and the final path
+move_cache = {angle: (math.cos(math.radians(angle)), math.sin(math.radians(angle))) 
+              for angle in range(0, 360, ANGLE_RESOLUTION)}
+visualize_astar(Obstacles, path, exploration_order, move_cache, 5)
+
+# Convert to numpy arrays for animation
 np_path = np.array(path)
 np_closed_set = np.array(list(closed_set), dtype=float)
 
 num_visited = np_closed_set.shape[0]
 path_length = len(path)
 num_frames = num_visited + path_length
-
-# Animate exploration and path
-fig, exploration_draw, path_line, cbar, cstep, filename = init_animation(start, goal, path, Obstacles, num_visited)
-
-# Save animation to disk
-save_progress = None
-create_animation(fig, num_frames, filename, show = False, write = True)
