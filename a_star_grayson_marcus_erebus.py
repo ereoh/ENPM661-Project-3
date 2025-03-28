@@ -411,7 +411,7 @@ def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
                                  (int(new_x * SCALE), int((HEIGHT - new_y) * SCALE)), 2)  # Scale coordinates
 
         pygame.display.flip()
-        pygame.time.delay(10)  # Delay for animation effect
+        pygame.time.delay(1)  # Delay for animation effect
 
     # Draw the final path in red
     for i in range(len(path) - 1):
@@ -483,6 +483,14 @@ try:
             valid = True
         else:
             print("Invalid start point. Ensure it is within bounds and not inside an obstacle.")
+        
+    valid = False
+    while not valid:
+        start_theta = int(input("Enter start orientation (angle in degrees, 0-360): "))
+        if 0 <= start_theta < 360:
+            valid = True
+        else:
+            print("Invalid orientation. Please enter an angle between 0 and 360 degrees.")
 
     valid = False
     while not valid:
@@ -491,20 +499,31 @@ try:
             valid = True
         else:
             print("Invalid goal point. Ensure it is within bounds and not inside an obstacle.")
+
+    valid = False
+    while not valid:
+        try:
+            L = float(input("Enter the length of each step (L): "))
+            if L <= 0:
+                print("Length must be positive.")
+            else:
+                valid = True
+        except ValueError:
+            print("Invalid input. Please enter a numeric value for length.")
 except ValueError:
     print("Invalid input. Please enter integer coordinates.")
     sys.exit(1)
 
-start = (start_x, start_y, 0)
+start = (start_x, start_y, start_theta)
 goal = (goal_x, goal_y, 0)
 
 # Perform A* search and get the path
-path, closed_set, exploration_order = astar_search(start, goal, Obstacles, 5)
+path, closed_set, exploration_order = astar_search(start, goal, Obstacles, L)
 
 # Visualize the A* search process and the final path
 move_cache = {angle: (math.cos(math.radians(angle)), math.sin(math.radians(angle))) 
               for angle in range(0, 360, ANGLE_RESOLUTION)}
-visualize_astar(Obstacles, path, exploration_order, move_cache, 5)
+visualize_astar(Obstacles, path, exploration_order, move_cache, L)
 
 # Convert to numpy arrays for animation
 np_path = np.array(path)
