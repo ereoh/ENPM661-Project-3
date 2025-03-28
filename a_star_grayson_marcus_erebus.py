@@ -6,6 +6,7 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.image
 import matplotlib.animation as animation
+import matplotlib
 from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
 
@@ -373,6 +374,19 @@ def init_animation(start, goal, path, obstacles, num_visited):
     ax.scatter(goal[0], goal[1], marker='s', c='red')
 
     # Init exploration and path artists
+    # arrows
+    '''
+    https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.quiver.html
+    ax.quiver(
+        [X, Y], # arrow locations
+        U, # x arrow vector from location
+        V, # y arrow vector from location
+        [C], # colormapping
+        angles = 'xy', # vector is from (x,y) -> (x+u, y+v)
+        scale = float, # scales length of arrow
+    )
+    '''
+    
     exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
     exploration_draw.set_clim(0, num_visited) # colorbar init
     path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
@@ -387,6 +401,7 @@ def init_animation(start, goal, path, obstacles, num_visited):
     return fig, exploration_draw, path_line, cbar, cstep, filename
 
 def update_animation(i):
+    # Q.set_UVC(U, V)
     # first draw exploration
     if i < num_visited:
         exploration_draw.set_offsets(np_closed_set[:i])
@@ -406,13 +421,16 @@ def save_update(i, total):
 
 def create_animation(fig, num_frames, filename, show=True, write=True):
     global save_progress
+
     # generate animation
     ani = FuncAnimation(
-        fig, 
-        update_animation, 
-        frames=num_frames, 
-        interval=30, 
-        blit=True, 
+        fig, # figure to animate on
+        update_animation, # call each frame
+        frames=num_frames,  # total number of frames in animation
+        # init_func = None, # draw clear frame
+        # returns iterable of artists
+        interval=1, # delay between frames in ms
+        blit=True, # use blitting optimization
     )
 
     if show:

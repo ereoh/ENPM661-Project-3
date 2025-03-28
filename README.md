@@ -56,10 +56,9 @@ Then, enter in start and goal positions in the format: `x y theta`
     - clearance: 5mm?
     - Map: 250x600, same as project 2
         - use half planes, semi-algebriac models
-    - Goal threshold: 1.5mm radius
+    - Goal threshold: robot center within 1.5mm radius (any orientation)
     - State threshold: 0.5 xy and 30 degrees
     - Action Space
-        - 
 - User Input
     - Start: x y theta
     - Goal: x y theta
