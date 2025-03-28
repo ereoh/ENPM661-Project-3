@@ -411,10 +411,9 @@ def update_animation(i):
         ax.quiver(exploration_x, exploration_y, exploration_u, exploration_v, angles='xy', scale_units='xy', scale=1, color='green', width=0.001)
 
         
-        #exploration_quiver[0].set_UVC(u,v)
         #exploration_draw.set_offsets(np_closed_set[:i])
         #exploration_draw.set_array(np.arange(i))
-        cbar.set_ticks(np.arange(0, np_closed_set.shape[0], cstep))
+        #cbar.set_ticks(np.arange(0, np_closed_set.shape[0], cstep))
 
         path_line.set_data([],[])
     # then path
@@ -519,6 +518,8 @@ path, closed_set = astar_search(start, goal, Obstacles, 1)
 np_path = np.array(path)
 print(np_path[0]) # for test
 np_closed_set = np.array(list(closed_set), dtype=float)
+np.save('closed_set.npy', np_closed_set)
+np.savetxt('closed_set.txt', np_closed_set, delimiter=",")
 print(np_closed_set[0]) # for test
 
 num_visited = np_closed_set.shape[0]
