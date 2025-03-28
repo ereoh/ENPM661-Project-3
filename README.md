@@ -5,8 +5,8 @@ UID: 115837461
 Directory ID: ggilbert
 
 Marcus Hurt
-UID:
-Directory ID:
+UID: 121361738
+Directory ID: mhurt
 
 Erebus Oh
 UID: 

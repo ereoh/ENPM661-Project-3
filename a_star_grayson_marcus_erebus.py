@@ -1,165 +1,180 @@
-from collections import namedtuple
-import numpy as np
-import sys
 import heapq
 import math
 import pygame
+import time
 
-# Define colors
+# Define colors for visualization
 red, blue, green, grey = (0, 0, 255), (255, 0, 0), (0, 255, 0), (128, 128, 128)
 
-# Resolution and map dimensions
-ANGLE_RESOLUTION, STEP_RESOLUTION = 30, 0.5
-WIDTH, HEIGHT, SCALE = 600, 250, 3
-
+# Base class for obstacles
 class Obstacle:
     def is_inside_obstacle(self, x, y):
-        raise NotImplementedError
+        raise NotImplementedError  # To be implemented by subclasses
 
+# Obstacle defined by lines connecting vertices
 class LineDefinedObstacle:
     def __init__(self, vertices):
-        self.lines = self.compute_line_constraints(vertices)
+        self.lines = self.compute_line_constraints(vertices)  # Precompute line constraints
 
     def compute_line_constraints(self, vertices):
         lines = []
         for i in range(len(vertices)):
+            # Compute line equation ax + by + c = 0
             x1, y1 = vertices[i]
             x2, y2 = vertices[(i + 1) % len(vertices)]
             a, b, c = y2 - y1, x1 - x2, -(y2 - y1) * x1 - (x1 - x2) * y1
+            # Determine which side of the line is inside the obstacle
             side = 1 if (a * vertices[(i + 2) % len(vertices)][0] + b * vertices[(i + 2) % len(vertices)][1] + c) > 0 else -1
             lines.append((a, b, c, side))
         return lines
 
     def is_inside_obstacle(self, x, y):
+        # Check if the point satisfies all line constraints
         return all((a * x + b * y + c) * side >= 0 for a, b, c, side in self.lines)
 
+# Circular obstacle
 class Circle(Obstacle):
     def __init__(self, center, radius):
-        self.center, self.radius = center, radius
+        self.center, self.radius = center, radius  # Store center and radius
 
     def is_inside_obstacle(self, x, y):
+        # Check if the point is within the circle
         return (x - self.center[0]) ** 2 + (y - self.center[1]) ** 2 <= self.radius ** 2
 
+# Obstacle shaped like the letter 'E'
 class EObstacle(Obstacle):
     def __init__(self, origin, width, height):
         self.origin, self.width, self.height = origin, width, height
+        # Define the bars and spine of the 'E'
         self.bottom_bar = LineDefinedObstacle([
-            (origin[0] + 6, origin[1]), 
+            (origin[0] + 16, origin[1]), 
             (origin[0] + width, origin[1]), 
-            (origin[0] + width, origin[1] + 6), 
-            (origin[0] + 6, origin[1] + 6)
+            (origin[0] + width, origin[1] + 16), 
+            (origin[0] + 16, origin[1] + 16)
         ])
         self.top_bar = LineDefinedObstacle([
-            (origin[0] + 6, origin[1] + height - 6), 
-            (origin[0] + width, origin[1] + height - 6), 
+            (origin[0] + 16, origin[1] + height - 16), 
+            (origin[0] + width, origin[1] + height - 16), 
             (origin[0] + width, origin[1] + height), 
-            (origin[0] + 6, origin[1] + height)
+            (origin[0] + 16, origin[1] + height)
         ])
         self.middle_bar = LineDefinedObstacle([
-            (origin[0] + 6, (origin[1] + height // 2) - 3), 
-            (origin[0] + width, (origin[1] + height // 2) - 3), 
-            (origin[0] + width, (origin[1] + height // 2) + 3), 
-            (origin[0] + 6, (origin[1] + height // 2) + 3)
+            (origin[0] + 16, (origin[1] + height // 2) - 8), 
+            (origin[0] + width, (origin[1] + height // 2) - 8), 
+            (origin[0] + width, (origin[1] + height // 2) + 8), 
+            (origin[0] + 16, (origin[1] + height // 2) + 8)
         ])
         self.spine = LineDefinedObstacle([
             (origin[0], origin[1]), 
-            (origin[0] + 6, origin[1]), 
-            (origin[0] + 6, origin[1] + height), 
+            (origin[0] + 16, origin[1]), 
+            (origin[0] + 16, origin[1] + height), 
             (origin[0], origin[1] + height)
         ])
 
     def is_inside_obstacle(self, x, y):
+        # Check if the point is inside any part of the 'E'
         return (self.bottom_bar.is_inside_obstacle(x, y) or 
                 self.top_bar.is_inside_obstacle(x, y) or 
                 self.middle_bar.is_inside_obstacle(x, y) or 
                 self.spine.is_inside_obstacle(x, y))
 
+# Obstacle shaped like the letter 'N'
 class NObstacle(Obstacle): 
     def __init__(self, origin, width, height):
         self.origin, self.width, self.height = origin, width, height
+        # Define the bars and diagonal of the 'N'
         self.left_bar = LineDefinedObstacle([
             (origin[0], origin[1]), 
-            (origin[0] + 6, origin[1]), 
-            (origin[0] + 6, origin[1] + height), 
+            (origin[0] + 16, origin[1]), 
+            (origin[0] + 16, origin[1] + height), 
             (origin[0], origin[1] + height)
         ])
         self.right_bar = LineDefinedObstacle([
-            (origin[0] + width - 6, origin[1]), 
+            (origin[0] + width - 16, origin[1]), 
             (origin[0] + width, origin[1]), 
             (origin[0] + width, origin[1] + height), 
-            (origin[0] + width - 6, origin[1] + height)
+            (origin[0] + width - 16, origin[1] + height)
         ])
         self.diagonal_bar = LineDefinedObstacle([
-            (origin[0] + 6, origin[1] + height),
-            (origin[0] + 6, origin[1] + height - 20),
-            (origin[0] + width - 6, origin[1]),
-            (origin[0] + width - 6, origin[1] + 20)
+            (origin[0] + 16, origin[1] + height),
+            (origin[0] + 16, origin[1] + height - 55),
+            (origin[0] + width - 16, origin[1]),
+            (origin[0] + width - 16, origin[1] + 55)
         ])
     
     def is_inside_obstacle(self, x, y):
+        # Check if the point is inside any part of the 'N'
         return (self.left_bar.is_inside_obstacle(x, y) or 
                 self.right_bar.is_inside_obstacle(x, y) or 
                 self.diagonal_bar.is_inside_obstacle(x, y))
 
+# Obstacle shaped like the letter 'P'
 class PObstacle(Obstacle):
     def __init__(self, origin, width, height):
         self.origin, self.width, self.height = origin, width, height
+        # Define the spine and head of the 'P'
         self.spine = LineDefinedObstacle([
             (origin[0], origin[1]), 
-            (origin[0] + 6, origin[1]), 
-            (origin[0] + 6, origin[1] + height), 
+            (origin[0] + 16, origin[1]), 
+            (origin[0] + 16, origin[1] + height), 
             (origin[0], origin[1] + height)
         ])
         self.head = LineDefinedObstacle([
-            (origin[0] + 6, origin[1] + height),
-            (origin[0] + 6, origin[1] + height - 50),
-            (origin[0] + width - 6, origin[1] + height - 50),
-            (origin[0] + width - 6, origin[1] + height)
+            (origin[0] + 16, origin[1] + height),
+            (origin[0] + 16, origin[1] + height - 50),
+            (origin[0] + width - 16, origin[1] + height - 50),
+            (origin[0] + width - 16, origin[1] + height)
         ])
-        self.circle = Circle((origin[0] + width - 6, origin[1] + height - 25), 25)
+        self.circle = Circle((origin[0] + width - 16, origin[1] + height - 25), 25)
 
     def is_inside_obstacle(self, x, y):
+        # Check if the point is inside any part of the 'P'
         return (self.spine.is_inside_obstacle(x, y) or 
                 self.head.is_inside_obstacle(x, y) or 
                 self.circle.is_inside_obstacle(x, y))
 
+# Obstacle shaped like the letter 'M'
 class MObstacle(Obstacle):
     def __init__(self, origin, width, height):
         self.origin, self.width, self.height = origin, width, height
+        # Define the bars and diagonals of the 'M'
         self.left_bar = LineDefinedObstacle([
             (origin[0], origin[1]), 
-            (origin[0] + 6, origin[1]), 
-            (origin[0] + 6, origin[1] + height), 
+            (origin[0] + 16, origin[1]), 
+            (origin[0] + 16, origin[1] + height), 
             (origin[0], origin[1] + height)
         ])
         self.right_bar = LineDefinedObstacle([
-            (origin[0] + width - 6, origin[1]), 
+            (origin[0] + width - 16, origin[1]), 
             (origin[0] + width, origin[1]), 
             (origin[0] + width, origin[1] + height), 
-            (origin[0] + width - 6, origin[1] + height)
+            (origin[0] + width - 16, origin[1] + height)
         ])
         self.left_diagonal = LineDefinedObstacle([
-            (origin[0] + 6, origin[1] + height),
-            (origin[0] + 6, origin[1] + height - 20),
+            (origin[0] + 16, origin[1] + height),
+            (origin[0] + 16, origin[1] + height - 55),
             (origin[0] + width // 2, origin[1] + height // 2),
-            (origin[0] + width // 2, origin[1] + height // 2 + 20)
+            (origin[0] + width // 2, origin[1] + height // 2 + 55)
         ])
         self.right_diagonal = LineDefinedObstacle([
-            (origin[0] + width - 6, origin[1] + height),
-            (origin[0] + width - 6, origin[1] + height - 20),
+            (origin[0] + width - 16, origin[1] + height),
+            (origin[0] + width - 16, origin[1] + height - 55),
             (origin[0] + width // 2, origin[1] + height // 2),
-            (origin[0] + width // 2, origin[1] + height // 2 + 20)
+            (origin[0] + width // 2, origin[1] + height // 2 + 55)
         ])
     
     def is_inside_obstacle(self, x, y):
+        # Check if the point is inside any part of the 'M'
         return (self.left_bar.is_inside_obstacle(x, y) or 
                 self.right_bar.is_inside_obstacle(x, y) or 
                 self.left_diagonal.is_inside_obstacle(x, y) or 
                 self.right_diagonal.is_inside_obstacle(x, y))
 
+# Obstacle shaped like the number '6'
 class SixObstacle(Obstacle):
     def __init__(self, origin, width, height):
         self.origin, self.width, self.height = origin, width, height
+        # Define the base, spine, and top bar of the '6'
         self.base = LineDefinedObstacle([
             (origin[0], origin[1]),
             (origin[0] + width, origin[1]),
@@ -168,25 +183,28 @@ class SixObstacle(Obstacle):
         ])
         self.spine = LineDefinedObstacle([
             (origin[0], origin[1] + height // 2),
-            (origin[0] + 6, origin[1] + height // 2),
-            (origin[0] + 6, origin[1] + height),
+            (origin[0] + 16, origin[1] + height // 2),
+            (origin[0] + 16, origin[1] + height),
             (origin[0], origin[1] + height)
         ])
         self.top_bar = LineDefinedObstacle([
-            (origin[0] + 6, origin[1] + height - 6),
-            (origin[0] + width, origin[1] + height - 6),
+            (origin[0] + 16, origin[1] + height - 16),
+            (origin[0] + width, origin[1] + height - 16),
             (origin[0] + width, origin[1] + height),
-            (origin[0] + 6, origin[1] + height)
+            (origin[0] + 16, origin[1] + height)
         ])
 
     def is_inside_obstacle(self, x, y):
+        # Check if the point is inside any part of the '6'
         return (self.top_bar.is_inside_obstacle(x, y) or 
                 self.base.is_inside_obstacle(x, y) or 
                 self.spine.is_inside_obstacle(x, y))
 
+# Obstacle shaped like the number '1'
 class OneObstacle(Obstacle):
     def __init__(self, origin, width, height):
         self.origin, self.width, self.height = origin, width, height
+        # Define the bar of the '1'
         self.bar = LineDefinedObstacle([
             (origin[0], origin[1]),
             (origin[0] + width, origin[1]),
@@ -195,77 +213,104 @@ class OneObstacle(Obstacle):
         ])
     
     def is_inside_obstacle(self, x, y):
+        # Check if the point is inside the '1'
         return self.bar.is_inside_obstacle(x, y)
 
-def discretize(x, y, theta, pos_res=STEP_RESOLUTION, angle_res=ANGLE_RESOLUTION):
-    return round(x / pos_res) * pos_res, round(y / pos_res) * pos_res, round(theta / angle_res) * angle_res % 360
+# Resolution and map dimensions
+WIDTH, HEIGHT, SCALE = 600, 250, 3
+
+# Define movement directions and discretization parameters
+DIRECTIONS = [-60, -30, 0, 30, 60]  # Degrees
+THETA_DISCRETIZATION = 30           # Degrees
+POS_DISCRETIZATION = 0.5            # Units
 
 def is_valid_point(x, y, obstacles):
+    # Check if the point is within bounds and not inside any obstacle
     if not (5 <= x <= WIDTH - 6 and 5 <= y <= HEIGHT - 6):
         return False
     return not any(obstacle.is_inside_obstacle(x, y) for obstacle in obstacles)
 
+def normalize_angle(theta):
+    # Normalize angle to the range [0, 360)
+    return (theta + 360) % 360
+
+def discretize_state(x, y, theta):
+    # Convert continuous state to discrete state for grid-based representation
+    return (round(x / (POS_DISCRETIZATION * L)), round(y / (POS_DISCRETIZATION * L)), round(normalize_angle(theta) / THETA_DISCRETIZATION))
+
+def heuristic(x, y, goal):
+    # Compute Euclidean distance as the heuristic
+    return math.hypot(goal[0] - x, goal[1] - y)
+
 def astar_search(start, goal, obstacles, L):
-    move_angles = [-60, -30, 0, 30, 60]
-    move_cache = {angle: (L * math.cos(math.radians(angle)), L * math.sin(math.radians(angle))) for angle in range(0, 360, ANGLE_RESOLUTION)}
-    start_node, goal_node = discretize(*start), discretize(goal[0], goal[1], 0)
-    goal_pos = goal_node[:2]
+    # Initialize start states
+    start_x, start_y, start_theta = start
+    start_theta = normalize_angle(start_theta)
+    start_state = (start_x, start_y, start_theta)
+    start_discrete = discretize_state(*start_state)
 
-    def heuristic(a, b):
-        return math.hypot(b[0] - a[0], b[1] - a[1])
+    # Initialize visited matrix
+    VisitedMatrix = [[[0 for _ in range(int(360 / THETA_DISCRETIZATION))] 
+             for _ in range(int(HEIGHT / (POS_DISCRETIZATION * L)))] 
+             for _ in range(int(WIDTH / (POS_DISCRETIZATION * L)))]
 
-    open_set, C2C, total_cost, parent = [], {start_node: 0}, {start_node: heuristic(start_node, goal_pos)}, {}
-    visited = np.zeros((500, 1200, 12), dtype=bool)
-    exploration_order = []
+    # Priority queue for A* search
+    open_set = [(heuristic(start_x, start_y, goal), 0, start_state)]
+    came_from = {}  # Track the path
+    cost_so_far = {start_discrete: 0}  # Cost to reach each state
+    explored_order = []  # Track exploration order
 
-    heapq.heappush(open_set, (0, start_node))
     while open_set:
-        _, current = heapq.heappop(open_set)
-        x, y, theta = current
-        key = discretize(x, y, theta)
-        x_idx, y_idx, theta_idx = int(x * 2), int(y * 2), int(theta / ANGLE_RESOLUTION)
+        # Get the state with the lowest cost
+        _, cost, (x, y, theta) = heapq.heappop(open_set)
+        current_discrete = discretize_state(x, y, theta)
+        explored_order.append((x, y, theta))
 
-        if visited[y_idx, x_idx, theta_idx]:
-            continue
-        visited[y_idx, x_idx, theta_idx] = True
-        exploration_order.append(current)
+        if heuristic(x, y, goal) <= 1.5 * L:
+            # Reconstruct path if goal is reached
+            path = [(x, y, theta)]
+            while current_discrete in came_from:
+                current_discrete = came_from[current_discrete]
+                x_d, y_d, t_d = current_discrete
+                path.append((x_d * POS_DISCRETIZATION * L,
+                             y_d * POS_DISCRETIZATION * L,
+                             t_d * THETA_DISCRETIZATION))
+            path.reverse()
+            return path, explored_order
 
-        if heuristic((x, y), goal_pos) < 1.5:
-            goal_node = (x, y, theta)
-            break
+        for d_theta in DIRECTIONS:
+            # Compute new state after applying action
+            new_theta = normalize_angle(theta + d_theta)
+            rad = math.radians(new_theta)
+            new_x = x + L * math.cos(rad)
+            new_y = y + L * math.sin(rad)
 
-        for delta_angle in move_angles:
-            new_theta = (theta + delta_angle) % 360
-            dx, dy = move_cache[new_theta]
-            new_x, new_y = x + dx, y + dy
-            new_key = discretize(new_x, new_y, new_theta)
-            new_x_idx, new_y_idx, new_theta_idx = int(new_key[0] * 2), int(new_key[1] * 2), int(new_key[2] / ANGLE_RESOLUTION)
-
-            if (new_x_idx < 0 or new_x_idx >= 1200 or new_y_idx < 0 or new_y_idx >= 500 or
-                visited[new_y_idx, new_x_idx, new_theta_idx] or not is_valid_point(new_key[0], new_key[1], obstacles)):
+            # Check if the new point is valid
+            if not is_valid_point(new_x, new_y, obstacles):
                 continue
 
-            tentative_C2C = C2C[key] + L
-            if new_key not in C2C or tentative_C2C < C2C[new_key]:
-                C2C[new_key], total_cost[new_key] = tentative_C2C, tentative_C2C + heuristic(new_key, goal_pos)
-                heapq.heappush(open_set, (total_cost[new_key], new_key))
-                parent[new_key] = key
+            new_discrete = discretize_state(new_x, new_y, new_theta)
+            i, j, k = new_discrete
+            new_cost = cost + L
+            # Check if the new state has been visited or if the cost is lower
+            if (VisitedMatrix[i][j][k] == 0) or (new_cost < cost_so_far.get(new_discrete, float('inf'))):
+                VisitedMatrix[i][j][k] = 1  # mark as visited region
+                cost_so_far[new_discrete] = new_cost
+                priority = new_cost + heuristic(new_x, new_y, goal)
+                heapq.heappush(open_set, (priority, new_cost, (new_x, new_y, new_theta)))
+                came_from[new_discrete] = current_discrete  # Track the path
 
-    path, key = [], goal_node
-    while key in parent:
-        path.append(key)
-        key = parent[key]
-    path.append(start)  # Ensure the start node is included
-    path.reverse()
-    return path, visited, exploration_order
+    return None, explored_order  # No path found
 
 def draw_obstacles(screen, obstacles):
+    # Draw obstacles on the screen
     for x in range(WIDTH):
         for y in range(HEIGHT):
             if not is_valid_point(x, y, obstacles):
                 screen.set_at((int(x * SCALE), int((HEIGHT - y) * SCALE)), grey)
 
 def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
+    # Animate the A* search process
     move_angles = [-60, -30, 0, 30, 60]
     for node in exploration_order:
         x, y, theta = node
@@ -294,6 +339,7 @@ def animate_astar(screen, obstacles, path, exploration_order, move_cache, L):
     pygame.display.flip()
 
 def visualize_astar(obstacles, path, exploration_order, move_cache, L):
+    # Visualize the A* search process
     pygame.init()
     screen = pygame.display.set_mode((WIDTH * SCALE, HEIGHT * SCALE))
     pygame.display.set_caption("A* Pathfinding Animation")
@@ -309,7 +355,7 @@ def visualize_astar(obstacles, path, exploration_order, move_cache, L):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        clock.tick(30)
+        clock.tick(60)
     pygame.quit()
 
 E_WIDTH, E_HEIGHT, N_WIDTH, N_HEIGHT = 50, 150, 50, 150
@@ -326,56 +372,67 @@ Obstacles = [
     OneObstacle((510, 50), ONE_WIDTH, ONE_HEIGHT)
 ]
 
-try:
-    print("Maze: Bottom left corner is (5, 5) and top right corner is (", (WIDTH - 6), ",", (HEIGHT - 6), ")")
-    valid = False
-    while not valid:
-        start_x, start_y = map(int, input("Enter start point (x y theta): ").split())
+
+print("Maze: Bottom left corner is (5, 5) and top right corner is (", (WIDTH - 6), ",", (HEIGHT - 6), ")")
+valid = False
+while not valid:
+    try:
+        start_x, start_y = map(int, input("Enter start point (x y): ").split())
         if is_valid_point(start_x, start_y, Obstacles):
             valid = True
         else:
             print("Invalid start point. Ensure it is within bounds and not inside an obstacle.")
-    valid = False
-    while not valid:
+    except ValueError:
+        print("Invalid input. Please enter integer coordinates for the start point.")
+
+valid = False
+while not valid:
+    try:
         start_theta = int(input("Enter start orientation (angle in degrees, 0-360): "))
         if 0 <= start_theta < 360:
             valid = True
         else:
             print("Invalid orientation. Please enter an angle between 0 and 360 degrees.")
-    valid = False
-    while not valid:
-        goal_x, goal_y = map(int, input("Enter goal point (x y theta): ").split())
+    except ValueError:
+        print("Invalid input. Please enter a numeric value for the angle.")
+
+valid = False
+while not valid:
+    try:
+        goal_x, goal_y = map(int, input("Enter goal point (x y): ").split())
         if is_valid_point(goal_x, goal_y, Obstacles):
             valid = True
         else:
             print("Invalid goal point. Ensure it is within bounds and not inside an obstacle.")
-    valid = False
-    while not valid:
-        try:
-            L = float(input("Enter the length of each step (L): "))
-            if L <= 0:
-                print("Length must be positive.")
-            else:
-                valid = True
-        except ValueError:
-            print("Invalid input. Please enter a numeric value for length.")
-except ValueError:
-    print("Invalid input. Please enter integer coordinates.")
-    sys.exit(1)
+    except ValueError:
+        print("Invalid input. Please enter integer coordinates for the goal point.")
+
+valid = False
+while not valid:
+    try:
+        L = float(input("Enter the length of each step (L): "))
+        if L <= 0:
+            print("Length must be positive.")
+        else:
+            valid = True
+    except ValueError:
+        print("Invalid input. Please enter a numeric value for length.")
 
 start = (start_x, start_y, start_theta)
-goal = (goal_x, goal_y, 0)
+goal = (goal_x, goal_y)
 
-path, closed_set, exploration_order = astar_search(start, goal, Obstacles, L)
-print(len(exploration_order))
+start_time = time.time()  # Start time for the A* search
+print("Starting A* search...")
+path, exploration_order = astar_search(start, goal, Obstacles, L)
+end_time = time.time()  # End time for the A* search
+print("A* search completed in {:.4f} seconds".format(end_time - start_time))
+# Print the results of the A* search
+print(len(exploration_order), " nodes explored during A* search")
+if path is None:
+    print("No path found to the goal.")
+else:
+    print("Path found to the goal.")
 
 move_cache = {angle: (math.cos(math.radians(angle)), math.sin(math.radians(angle))) 
-              for angle in range(0, 360, ANGLE_RESOLUTION)}
+              for angle in range(0, 360, THETA_DISCRETIZATION)}
 visualize_astar(Obstacles, path, exploration_order, move_cache, L)
-
-np_path = np.array(path)
-np_closed_set = np.array(list(closed_set), dtype=float)
-
-num_visited = np_closed_set.shape[1]
-path_length = np_path.shape[1]
-num_frames = num_visited + path_length
