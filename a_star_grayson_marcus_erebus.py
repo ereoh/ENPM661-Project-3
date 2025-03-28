@@ -508,7 +508,7 @@ start = (start_x, start_y, 0)
 goal = (goal_x, goal_y, 0)
 
 # Perform A* search and get the path
-path, closed_set, exploration_order = astar_search(start, goal, Obstacles, 10) # Changed step from 5 to 10
+path, closed_set, exploration_order = astar_search(start, goal, Obstacles, 5) # Changed step from 5 to 10
 print(len(exploration_order))
 print(path[0])
 
