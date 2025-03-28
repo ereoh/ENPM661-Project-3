@@ -9,6 +9,7 @@ import matplotlib.animation as animation
 import matplotlib
 from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
+import math
 
 # Define colors
 red = (0, 0, 255)
@@ -19,6 +20,9 @@ grey = (128, 128, 128)
 # define space resolution
 ANGLE_RESOLUTION = 30
 STEP_RESOLUTION = 1
+
+WIDTH = 600
+HEIGHT = 250
 
 # Base class for obstacles
 class Obstacle:
@@ -350,7 +354,7 @@ def init_animation(start, goal, path, obstacles, num_visited):
     print("Initializing animation")
 
     # draw background
-    fig, ax = plt.subplots(figsize=(15, 6))
+    fig, ax = plt.subplots(figsize=(WIDTH//50, HEIGHT//50))
     fig.suptitle(f'A-Star Search from {start} to {goal}')
     ax.set_xlim(-10, WIDTH + 10)
     ax.set_ylim(-10, HEIGHT + 10)
@@ -358,69 +362,77 @@ def init_animation(start, goal, path, obstacles, num_visited):
     border_x = [4, 4, WIDTH-5, WIDTH-5, 4]
     border_y = [4, HEIGHT-5, HEIGHT-5, 4, 4]
     ax.plot(border_x, border_y, linewidth=2, c='b')
+    print("\tborders drawn")
 
     # draw obstacles (Blue)
-    for i in range(WIDTH):
+    for i in tqdm(range(WIDTH), desc="Drawing Obstacles", unit="rows"):
         for j in range(HEIGHT):
             for obstacle in obstacles:
                 # Color pixel if inside obstacle
                 if obstacle.is_inside_obstacle(i, j):
                     ax.plot(i, j, marker='s', color='blue')
+    print("\tobstacles drawn")
 
     # draw start (Green)
     ax.scatter(start[0], start[1], marker='s', c='#7dffa0')
+    print("\tstart drawn")
 
     # draw goal (Red)
     ax.scatter(goal[0], goal[1], marker='s', c='red')
+    print("\tgoal drawn")
 
     # Init exploration and path artists
-    # arrows
-    '''
-    https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.quiver.html
-    ax.quiver(
-        [X, Y], # arrow locations
-        U, # x arrow vector from location
-        V, # y arrow vector from location
-        [C], # colormapping
-        angles = 'xy', # vector is from (x,y) -> (x+u, y+v)
-        scale = float, # scales length of arrow
-    )
-    '''
     
-    exploration_draw = ax.scatter([], [], marker='s', c=[], cmap='viridis')
-    exploration_draw.set_clim(0, num_visited) # colorbar init
+    # exploration_draw.set_clim(0, num_visited) # colorbar init
+    exploration_draw = []
+    print("\texploration path artist initialized")
     path_line, = ax.plot([], [], marker='s', linewidth=1, c='#ff29f8')
+    print("\tpath artist initialized")
+
+    fig.tight_layout()
 
     # Init Colorbar
-    cstep = max(1, int(num_visited / 10)) # want 10 ticks along colorbar
-    cbar = fig.colorbar(exploration_draw, ax=ax)
-    cbar.set_label('Explored Order')
+    # cstep = max(1, int(num_visited / 10)) # want 10 ticks along colorbar
+    # cbar = fig.colorbar(exploration_draw, ax=ax)
+    # cbar.set_label('Explored Order')
+    # print("\tcolor bar initialized")
 
-    filename = f"AStar_animation_{start[0]}-{start[1]}_to_{goal[0]}-{goal[1]}"
-
-    return fig, exploration_draw, path_line, cbar, cstep, filename
+    return fig, ax, exploration_draw, path_line#, cbar, cstep
 
 def update_animation(i):
-    # Q.set_UVC(U, V)
     # first draw exploration
     if i < num_visited:
-        exploration_draw.set_offsets(np_closed_set[:i])
-        exploration_draw.set_array(np.arange(i))
-        cbar.set_ticks(np.arange(0, np_closed_set.shape[0], cstep))
+
+        # draw new arrow
+        x = np_closed_set[0, i]
+        y = np_closed_set[1, i]
+        theta = np_closed_set[2, i]
+        dx = STEP_RESOLUTION * math.cos(math.radians(theta))
+        dy = STEP_RESOLUTION * math.sin(math.radians(theta))
+        # print(x, y, dx, dy)
+        # vector = ax.annotate("", xytext=(x, y), xy=(x + dx, y + dy), arrowprops=dict(arrowstyle="->"), annotation_clip=False)
+        vector = ax.arrow(x, y, dx, dy, width = 0.0005)
+
+        exploration_draw.append(vector)
+        
+       
+        # cbar.set_ticks(np.arange(0, np_closed_set.shape[1], cstep))
 
         path_line.set_data([],[])
     # then path
-    else:
-        idx = i - np_closed_set.shape[0]
-        path_line.set_data(np_path[:idx].T)
+    # else:
+    #     idx = i - np_closed_set.shape[1]
+    #     path_line.set_data(np_path[:2, :i].T)
 
-    return exploration_draw, path_line,
+    return *exploration_draw, path_line,
 
 def save_update(i, total):
     save_progress.update(1)
 
-def create_animation(fig, num_frames, filename, show=True, write=True):
+def create_animation(fig, num_frames):
     global save_progress
+
+    print("Running animation")
 
     # generate animation
     ani = FuncAnimation(
@@ -431,40 +443,13 @@ def create_animation(fig, num_frames, filename, show=True, write=True):
         # returns iterable of artists
         interval=1, # delay between frames in ms
         blit=True, # use blitting optimization
+        repeat = False,
     )
 
-    if show:
-        plt.show()
+    plt.show(block=True)
 
-    if write:
+# Variables
 
-        save_progress = tqdm(total = num_frames, desc = "Saving Animation", unit='frames')
-        # save as MP4 or GIF
-        available_writers = animation.writers.list()
-        available_writers = animation.writers.list()
-
-        writer = 'ffmpeg'
-
-        if 'ffmpeg' in available_writers:
-            filename += ".mp4"
-        else:
-            filename += ".gif"
-            writer = "pillow"
-
-        # write animation as gif to disk
-        if writer == 'pillow':
-            print("Warning: ffmpeg not found! Using pillow and saving as GIF. This is significantly slower.")
-        
-        ani.save(
-            filename, 
-            writer=writer, 
-            fps=60, 
-            progress_callback=save_update
-        )
-        print(f"Saved animation to {filename}")
-
-WIDTH = 600
-HEIGHT = 250
 E_obstacle = EObstacle((80, 50), 50, 150)
 N_obstacle = NObstacle((150, 50), 50, 150)
 P_Obstacle = PObstacle((220, 50), 50, 150)
@@ -482,7 +467,7 @@ try:
 
     valid = False
     while not valid:
-        start_x, start_y = map(int, input("Enter start point (x y): ").split())
+        start_x, start_y = map(int, input("Enter start point (x y theta): ").split())
         if is_valid_point(start_x, start_y, Obstacles):
             valid = True
         else:
@@ -490,7 +475,7 @@ try:
     
     valid = False
     while not valid:
-        goal_x, goal_y = map(int, input("Enter goal point (x y): ").split())
+        goal_x, goal_y = map(int, input("Enter goal point (x y theta): ").split())
         if is_valid_point(goal_x, goal_y, Obstacles):
             valid = True
         else:
@@ -503,19 +488,24 @@ start = (start_x, start_y, 0)
 goal = (goal_x, goal_y, 0)
 
 # Perform A Star search and get the path
+print("Searching with A Star")
 path, closed_set = astar_search(start, goal, Obstacles, 1)
 
 # convert to numpy arrays for animation
-np_path = np.array(path)
-np_closed_set = np.array(list(closed_set), dtype=float)
+# (3, num points)
+np_path = np.array(path).T
+np_closed_set = np.array(list(closed_set), dtype=float).T
 
-num_visited = np_closed_set.shape[0]
-path_length = len(path)
+# print(np_path.shape)
+# print(np_closed_set.shape)
+
+num_visited = np_closed_set.shape[1]
+path_length = np_path.shape[1]
 num_frames = num_visited + path_length
 
 # Animate exploration and path
-fig, exploration_draw, path_line, cbar, cstep, filename = init_animation(start, goal, path, Obstacles, num_visited)
+fig, ax, exploration_draw, path_line= init_animation(start, goal, path, Obstacles, num_visited)
 
 # Save animation to disk
 save_progress = None
-create_animation(fig, num_frames, filename, show = False, write = True)
+create_animation(fig, num_frames)
